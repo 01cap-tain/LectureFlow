@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import authRoute from "./Routes/authRoute.js";
 import pool from "./Database/db.js";
+import adminRoutes from "./Routes/admin.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
@@ -38,11 +39,12 @@ app.use(
 );
 
 // Lightweight health check (must not touch the database)
-app.get("/health", (_req, res) => {
+app.get("/health", (req, res) => {
   res.status(200).json({ ok: true });
 });
 
 app.use("/auth", authRoute);
+app.use("/admin", adminRoutes);
 
 // Keep pool import so schema bootstrap in Database/db.js runs on boot
 void pool;
