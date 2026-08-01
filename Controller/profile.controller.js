@@ -1,0 +1,157 @@
+import pool from "../Database/db.js";
+
+/**
+ * Get current user profile
+ */
+export async function getMyProfile(req, res) {
+  try {
+    const userId = req.session.user.id;
+
+    const result = await pool.query(
+      `SELECT id, name, email, role, department_id, matric_no,
+              level, current_semester, phone, is_active, created_at
+       FROM users
+       WHERE id = $1`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      profile: result.rows[0],
+    });
+  } catch (err) {
+    console.error("getMyProfile error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not fetch profile",
+    });
+  }
+}
+
+/**
+ * Complete Profile (first time after signup)
+ */
+export async function completeProfile(req, res) {
+  const userId = req.session.user.id;
+  const { name, level, current_semester } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET name = $1,
+           level = $2,
+           current_semester = $3,
+           updated_at = NOW()
+       WHERE id = $4 AND role = 'student'
+       RETURNING id, name, email, role, department_id, matric_no,
+                 level, current_semester, phone, is_active`,
+      [name, level, current_semester, userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    // Update session with new data
+    req.session.user.name = name;
+    req.session.user.level = level;
+    req.session.user.current_semester = current_semester;
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile completed successfully",
+      profile: result.rows[0],
+    });
+  } catch (err) {
+    console.error("completeProfile error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not complete profile",
+    });
+  }
+}
+
+/**
+ * Update Profile later
+ */
+export async function updateProfile(req, res) {
+  const userId = req.session.user.id;
+  const { name, level, current_semester, phone } = req.body;
+
+  try {
+    const fields = [];
+    const values = [];
+    let index = 1;
+
+    if (name !== undefined) {
+      fields.push(`name = $${index++}`);
+      values.push(name);
+    }
+    if (level !== undefined) {
+      fields.push(`level = $${index++}`);
+      values.push(level);
+    }
+    if (current_semester !== undefined) {
+      fields.push(`current_semester = $${index++}`);
+      values.push(current_semester);
+    }
+    if (phone !== undefined) {
+      fields.push(`phone = $${index++}`);
+      values.push(phone || null);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No fields to update",
+      });
+    }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(userId);
+
+    const result = await pool.query(
+      `UPDATE users
+       SET ${fields.join(", ")}
+       WHERE id = $${index}
+       RETURNING id, name, email, role, department_id, matric_no,
+                 level, current_semester, phone, is_active`,
+      values,
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update session
+    const updated = result.rows[0];
+    req.session.user.name = updated.name;
+    req.session.user.level = updated.level;
+    req.session.user.current_semester = updated.current_semester;
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      profile: updated,
+    });
+  } catch (err) {
+    console.error("updateProfile error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not update profile",
+    });
+  }
+}

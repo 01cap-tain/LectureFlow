@@ -6,6 +6,7 @@ import cors from "cors";
 import authRoute from "./Routes/authRoute.js";
 import pool from "./Database/db.js";
 import adminRoutes from "./Routes/admin.routes.js";
+import profileRoutes from "./Routes/profile.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
@@ -45,6 +46,7 @@ app.get("/health", (req, res) => {
 
 app.use("/auth", authRoute);
 app.use("/admin", adminRoutes);
+app.use("/profile", profileRoutes);
 
 // Keep pool import so schema bootstrap in Database/db.js runs on boot
 void pool;
