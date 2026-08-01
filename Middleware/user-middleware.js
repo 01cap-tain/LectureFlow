@@ -31,6 +31,18 @@ export function validateSignUp(req, res, next) {
     } else if (!validator.isLength(matric_no, { min: 3, max: 50 })) {
       errors.push("Matric number must be between 3 and 50 characters");
     }
+    // ---- Matric Year Validation (reject future years only) ----
+    const yearMatch = matric_no.match(/(\d{2})/); // gets the first two digits
+    if (yearMatch) {
+      const matricYear = 2000 + parseInt(yearMatch[1], 10); // e.g. 22 → 2022
+      const currentYear = new Date().getFullYear();
+
+      if (matricYear > currentYear) {
+        errors.push(
+          `Matric year ${matricYear} cannot be in the future (current year is ${currentYear})`,
+        );
+      }
+    }
 
     // ---- password ----
     if (!password) {
