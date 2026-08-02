@@ -1,0 +1,116 @@
+import pool from "../Database/db.js";
+
+/**
+ * Schedule a new lecture (Moderator only)
+ */
+export async function scheduleLecture(req, res) {
+  const lecturer_id = req.session.user.id;
+  const department_id = req.session.user.department_id;
+
+  const { course_id, venue_id, date, start_time, end_time, notes } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1. Check course exists
+    const courseCheck = await client.query(
+      `SELECT id, department_id FROM courses 
+       WHERE id = $1 AND is_active = true LIMIT 1`,
+      [course_id],
+    );
+
+    if (courseCheck.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or inactive course",
+      });
+    }
+
+    // Optional: Ensure course belongs to lecturer's department
+    if (courseCheck.rows[0].department_id !== department_id) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        success: false,
+        message: "You can only schedule courses from your department",
+      });
+    }
+
+    // 2. Check venue exists and is active
+    const venueCheck = await client.query(
+      `SELECT id FROM venues 
+       WHERE id = $1 AND is_active = true LIMIT 1`,
+      [venue_id],
+    );
+
+    if (venueCheck.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or inactive venue",
+      });
+    }
+
+    // 3. Conflict Detection
+    const conflict = await client.query(
+      `SELECT id, course_id, start_time, end_time
+       FROM lectures
+       WHERE venue_id = $1
+         AND date = $2
+         AND status IN ('scheduled', 'postponed')
+         AND (
+           (start_time, end_time) OVERLAPS ($3::time, $4::time)
+         )
+       LIMIT 1`,
+      [venue_id, date, start_time, end_time],
+    );
+
+    if (conflict.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        success: false,
+        message: "Venue is already booked for the selected time",
+        conflict: conflict.rows[0],
+      });
+    }
+
+    // 4. Insert the lecture
+    const result = await client.query(
+      `INSERT INTO lectures (
+         course_id, lecturer_id, venue_id, department_id,
+         date, start_time, end_time, status, notes
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled', $8)
+       RETURNING *`,
+      [
+        course_id,
+        lecturer_id,
+        venue_id,
+        department_id,
+        date,
+        start_time,
+        end_time,
+        notes,
+      ],
+    );
+
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      success: true,
+      message: "Lecture scheduled successfully",
+      lecture: result.rows[0],
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("scheduleLecture error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not schedule lecture",
+    });
+  } finally {
+    client.release();
+  }
+}
