@@ -82,3 +82,72 @@ export function validateScheduleLecture(req, res, next) {
     });
   }
 }
+
+/**
+ * Validate Postpone Lecture
+ */
+export function validatePostponeLecture(req, res, next) {
+  try {
+    const date = typeof req.body?.date === "string" ? req.body.date.trim() : "";
+    const start_time =
+      typeof req.body?.start_time === "string"
+        ? req.body.start_time.trim()
+        : "";
+    const end_time =
+      typeof req.body?.end_time === "string" ? req.body.end_time.trim() : "";
+    const venue_id = req.body?.venue_id;
+    const notes =
+      typeof req.body?.notes === "string" ? req.body.notes.trim() : null;
+
+    const errors = [];
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+    // At least one field must be provided
+    if (!date && !start_time && !end_time && !venue_id && notes === null) {
+      errors.push(
+        "Provide at least one field to update (date, time, venue, or notes)",
+      );
+    }
+
+    if (
+      date &&
+      !validator.isDate(date, { format: "YYYY-MM-DD", strictMode: true })
+    ) {
+      errors.push("Date must be in YYYY-MM-DD format");
+    }
+
+    if (start_time && !timeRegex.test(start_time)) {
+      errors.push("start_time must be in HH:mm format");
+    }
+
+    if (end_time && !timeRegex.test(end_time)) {
+      errors.push("end_time must be in HH:mm format");
+    }
+
+    if (start_time && end_time && start_time >= end_time) {
+      errors.push("end_time must be after start_time");
+    }
+
+    if (venue_id && isNaN(Number(venue_id))) {
+      errors.push("venue_id must be a valid number");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    // Normalize
+    if (date) req.body.date = date;
+    if (start_time) req.body.start_time = start_time;
+    if (end_time) req.body.end_time = end_time;
+    if (venue_id) req.body.venue_id = Number(venue_id);
+    if (notes !== null) req.body.notes = notes || null;
+
+    next();
+  } catch (err) {
+    console.error("validatePostponeLecture error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}

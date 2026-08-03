@@ -177,3 +177,138 @@ export async function getVenues(req, res) {
     });
   }
 }
+
+/**
+ * Postpone a lecture
+ * Only the lecturer who created it can postpone it
+ */
+export async function postponeLecture(req, res) {
+  const lecturer_id = req.session.user.id;
+  const lectureId = req.params.id;
+  const { date, start_time, end_time, venue_id, notes } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1. Check lecture exists and belongs to this lecturer
+    const lectureCheck = await client.query(
+      `SELECT * FROM lectures 
+       WHERE id = $1 AND lecturer_id = $2 AND status IN ('scheduled', 'postponed')
+       LIMIT 1`,
+      [lectureId, lecturer_id],
+    );
+
+    if (lectureCheck.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        success: false,
+        message: "Lecture not found or you don't have permission to modify it",
+      });
+    }
+
+    const current = lectureCheck.rows[0];
+
+    // Use existing values if not provided
+    const newDate = date || current.date;
+    const newStart = start_time || current.start_time;
+    const newEnd = end_time || current.end_time;
+    const newVenue = venue_id || current.venue_id;
+
+    // 2. Conflict detection (only if time or venue changed)
+    if (date || start_time || end_time || venue_id) {
+      const conflict = await client.query(
+        `SELECT id FROM lectures
+         WHERE venue_id = $1
+           AND date = $2
+           AND id != $3
+           AND status IN ('scheduled', 'postponed')
+           AND (start_time, end_time) OVERLAPS ($4::time, $5::time)
+         LIMIT 1`,
+        [newVenue, newDate, lectureId, newStart, newEnd],
+      );
+
+      if (conflict.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          success: false,
+          message: "Venue is already booked for the selected time",
+        });
+      }
+    }
+
+    // 3. Update the lecture
+    const result = await client.query(
+      `UPDATE lectures
+       SET date = $1,
+           start_time = $2,
+           end_time = $3,
+           venue_id = $4,
+           notes = COALESCE($5, notes),
+           status = 'postponed',
+           updated_at = NOW()
+       WHERE id = $6
+       RETURNING *`,
+      [newDate, newStart, newEnd, newVenue, notes, lectureId],
+    );
+
+    await client.query("COMMIT");
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecture postponed successfully",
+      lecture: result.rows[0],
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("postponeLecture error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not postpone lecture",
+    });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Cancel a lecture
+ * Only the lecturer who created it can cancel it
+ */
+export async function cancelLecture(req, res) {
+  const lecturer_id = req.session.user.id;
+  const lectureId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      `UPDATE lectures
+       SET status = 'cancelled',
+           updated_at = NOW()
+       WHERE id = $1 
+         AND lecturer_id = $2 
+         AND status IN ('scheduled', 'postponed')
+       RETURNING *`,
+      [lectureId, lecturer_id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Lecture not found or you don't have permission to cancel it",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecture cancelled successfully",
+      lecture: result.rows[0],
+    });
+  } catch (err) {
+    console.error("cancelLecture error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not cancel lecture",
+    });
+  }
+}
