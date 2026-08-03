@@ -10,6 +10,7 @@ import {
   getVenues,
   postponeLecture,
   cancelLecture,
+  getMyLectures,
 } from "../Controller/lecture.controller.js";
 
 const router = express.Router();
@@ -46,4 +47,6 @@ router.patch(
   cancelLecture,
 );
 
+// Get my lectures
+router.get("/my", requireAuth, requireRole("moderator"), getMyLectures);
 export default router;

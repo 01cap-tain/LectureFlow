@@ -312,3 +312,104 @@ export async function cancelLecture(req, res) {
     });
   }
 }
+
+/**
+ * Get lectures created by the logged-in lecturer
+ * Automatically marks past lectures as "completed"
+ */
+export async function getMyLectures(req, res) {
+  try {
+    const lecturer_id = req.session.user.id;
+    const { status, upcoming } = req.query;
+
+    let query = `
+      SELECT 
+         l.id,
+         l.date,
+         l.start_time,
+         l.end_time,
+         CASE 
+           WHEN l.status IN ('scheduled', 'postponed')
+                AND (l.date < CURRENT_DATE 
+                     OR (l.date = CURRENT_DATE AND l.end_time < CURRENT_TIME))
+           THEN 'completed'
+           ELSE l.status
+         END AS status,
+         l.notes,
+         l.created_at,
+         l.updated_at,
+         c.course_code,
+         c.title AS course_title,
+         v.name AS venue_name,
+         v.location AS venue_location
+       FROM lectures l
+       JOIN courses c ON c.id = l.course_id
+       JOIN venues v ON v.id = l.venue_id
+       WHERE l.lecturer_id = $1
+    `;
+
+    const values = [lecturer_id];
+    let paramIndex = 2;
+
+    // Filter by status
+    if (status) {
+      const allowedStatuses = [
+        "scheduled",
+        "postponed",
+        "cancelled",
+        "completed",
+      ];
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid status. Allowed values: ${allowedStatuses.join(", ")}`,
+        });
+      }
+
+      // Special handling for "completed" filter
+      if (status === "completed") {
+        query += `
+          AND (
+            l.status = 'completed'
+            OR (
+              l.status IN ('scheduled', 'postponed')
+              AND (l.date < CURRENT_DATE 
+                   OR (l.date = CURRENT_DATE AND l.end_time < CURRENT_TIME))
+            )
+          )
+        `;
+      } else {
+        query += ` AND l.status = $${paramIndex}`;
+        values.push(status);
+        paramIndex++;
+      }
+    }
+
+    // Filter only upcoming lectures
+    if (upcoming === "true") {
+      query += `
+        AND (
+          l.date > CURRENT_DATE 
+          OR (l.date = CURRENT_DATE AND l.end_time > CURRENT_TIME)
+        )
+        AND l.status IN ('scheduled', 'postponed')
+      `;
+    }
+
+    query += ` ORDER BY l.date DESC, l.start_time DESC`;
+
+    const result = await pool.query(query, values);
+
+    return res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      lectures: result.rows,
+    });
+  } catch (err) {
+    console.error("getMyLectures error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not fetch lectures",
+    });
+  }
+}

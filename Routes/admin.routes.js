@@ -6,6 +6,8 @@ import {
   createDepartment,
   createFaculty,
   createLecturer,
+  createCourse,
+  createVenue,
 } from "../Controller/admin-auth.js";
 
 import {
@@ -13,6 +15,8 @@ import {
   validateCreateDepartment,
   validateCreateFaculty,
   validateCreateLecturer,
+  validateCreateCourse,
+  validateCreateVenue,
 } from "../Middleware/admin-middleware.js";
 
 const router = express.Router();
@@ -51,6 +55,24 @@ router.post(
   requireRole("admin"),
   validateCreateDepartment,
   createDepartment,
+);
+
+// Create Course
+router.post(
+  "/courses",
+  requireAuth,
+  requireRole("admin"),
+  validateCreateCourse,
+  createCourse,
+);
+
+// Create Venue
+router.post(
+  "/venues",
+  requireAuth,
+  requireRole("admin"),
+  validateCreateVenue,
+  createVenue,
 );
 
 export default router;

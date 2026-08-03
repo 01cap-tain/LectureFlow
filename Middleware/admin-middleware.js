@@ -172,3 +172,112 @@ export function validateCreateDepartment(req, res, next) {
       .json({ success: false, message: "Validation failed" });
   }
 }
+
+/**
+ * Validate Create Course
+ */
+export function validateCreateCourse(req, res, next) {
+  try {
+    const course_code =
+      typeof req.body?.course_code === "string"
+        ? req.body.course_code.trim()
+        : "";
+    const title =
+      typeof req.body?.title === "string" ? req.body.title.trim() : "";
+    const department_id = req.body?.department_id;
+    const level = req.body?.level;
+    const semester = req.body?.semester;
+    const type =
+      typeof req.body?.type === "string" ? req.body.type.trim() : "core";
+    const academic_year =
+      typeof req.body?.academic_year === "string"
+        ? req.body.academic_year.trim()
+        : "";
+
+    const errors = [];
+
+    if (!course_code || course_code.length < 3) {
+      errors.push("Course code is required (e.g. CSC 301)");
+    }
+
+    if (!title || title.length < 3) {
+      errors.push("Course title is required");
+    }
+
+    if (!department_id || isNaN(Number(department_id))) {
+      errors.push("Valid department_id is required");
+    }
+
+    if (![100, 200, 300, 400, 500, 600].includes(Number(level))) {
+      errors.push("Level must be one of: 100, 200, 300, 400, 500, 600");
+    }
+
+    if (![1, 2].includes(Number(semester))) {
+      errors.push("Semester must be 1 or 2");
+    }
+
+    if (!academic_year) {
+      errors.push("Academic year is required (e.g. 2025/2026)");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    req.body.course_code = course_code.toUpperCase();
+    req.body.title = title;
+    req.body.department_id = Number(department_id);
+    req.body.level = Number(level);
+    req.body.semester = Number(semester);
+    req.body.type = type || "core";
+    req.body.academic_year = academic_year;
+
+    next();
+  } catch (err) {
+    console.error("validateCreateCourse error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}
+
+/**
+ * Validate Create Venue
+ */
+export function validateCreateVenue(req, res, next) {
+  try {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const location =
+      typeof req.body?.location === "string" ? req.body.location.trim() : "";
+    const capacity = req.body?.capacity;
+
+    const errors = [];
+
+    if (!name || name.length < 2) {
+      errors.push("Venue name is required");
+    }
+
+    if (!location || location.length < 2) {
+      errors.push("Location is required");
+    }
+
+    if (!capacity || isNaN(Number(capacity)) || Number(capacity) < 1) {
+      errors.push("Capacity must be a positive number");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    req.body.name = name;
+    req.body.location = location;
+    req.body.capacity = Number(capacity);
+
+    next();
+  } catch (err) {
+    console.error("validateCreateVenue error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}
