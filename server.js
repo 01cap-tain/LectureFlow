@@ -8,7 +8,6 @@ import pool from "./Database/db.js";
 import adminRoutes from "./Routes/admin.routes.js";
 import profileRoutes from "./Routes/profile.routes.js";
 import lectureRoutes from "./Routes/lecture.routes.js";
-import courses from "./Routes/courses.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
@@ -51,7 +50,7 @@ app.use("/admin", adminRoutes);
 app.use("/profile", profileRoutes);
 
 app.use("/lectures", lectureRoutes);
-app.use("/courses/my", courses);
+
 // Keep pool import so schema bootstrap in Database/db.js runs on boot
 void pool;
 
