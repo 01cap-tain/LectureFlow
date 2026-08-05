@@ -3,7 +3,6 @@ import pool from "../Database/db.js";
 import { resolveDepartmentFromMatric } from "../Services/departmentFromMatric.js";
 
 // AUTH CONTROLLER: student SignUp uses DB transaction + department from matric
-
 /**
  * Safe user payload cached on the session (never includes password_hash).
  * Available after sign-in as req.session.user
@@ -290,3 +289,6 @@ async function SignOut(req, res) {
 }
 
 export { SignUp, SignIn, SignOut };
+
+
+

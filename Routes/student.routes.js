@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, requireRole } from "../Middleware/user-middleware.js";
+import { studentReadRateLimit } from "../Middleware/rate-limit.middleware.js";
 import {
   validateGetStudentLectures,
   validateVenueIdParam,
@@ -15,6 +16,7 @@ router.get(
   "/lectures",
   requireAuth,
   requireRole("student"),
+  studentReadRateLimit,
   validateGetStudentLectures,
   getStudentLectures,
 );
@@ -23,6 +25,7 @@ router.get(
   "/venues/:venue_id/queue",
   requireAuth,
   requireRole("student"),
+  studentReadRateLimit,
   validateVenueIdParam,
   getVenueQueue,
 );

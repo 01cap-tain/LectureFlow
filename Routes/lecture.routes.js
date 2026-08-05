@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, requireRole } from "../Middleware/user-middleware.js";
+import { lecturerWriteRateLimit } from "../Middleware/rate-limit.middleware.js";
 import {
   validateScheduleLecture,
   validatePostponeLecture,
@@ -26,6 +27,7 @@ router.post(
   "/",
   requireAuth,
   requireRole("moderator"),
+  lecturerWriteRateLimit,
   validateScheduleLecture,
   scheduleLecture,
 );
@@ -35,6 +37,7 @@ router.patch(
   "/:id/postpone",
   requireAuth,
   requireRole("moderator"),
+  lecturerWriteRateLimit,
   validatePostponeLecture,
   postponeLecture,
 );
@@ -44,9 +47,11 @@ router.patch(
   "/:id/cancel",
   requireAuth,
   requireRole("moderator"),
+  lecturerWriteRateLimit,
   cancelLecture,
 );
 
 // Get my lectures
 router.get("/my", requireAuth, requireRole("moderator"), getMyLectures);
 export default router;
+

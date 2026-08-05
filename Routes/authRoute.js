@@ -4,16 +4,16 @@ import {
   validateSignUp,
   validateSignIn,
   requireAuth,
-  requireRole,
 } from "../Middleware/user-middleware.js";
+import { authRateLimit } from "../Middleware/rate-limit.middleware.js";
 
 const router = express.Router();
 
 // Student registration only (role forced to 'student' in controller)
-router.post("/signup", validateSignUp, SignUp);
+router.post("/signup", authRateLimit, validateSignUp, SignUp);
 
 // All roles: admin | moderator | student
-router.post("/signin", validateSignIn, SignIn);
+router.post("/signin", authRateLimit, validateSignIn, SignIn);
 
 // Authenticated users only
 router.post("/signout", requireAuth, SignOut);
