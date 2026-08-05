@@ -1,4 +1,25 @@
 import pool from "../Database/db.js";
+import { clearStudentLecturesCache } from "../Services/studentLectureCache.js";
+import { clearVenueCache } from "../Services/venueCache.js";
+
+function getCampusDateTime() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: process.env.APP_TIME_ZONE || "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}:${values.second}`,
+  };
+}
 
 /**
  * Schedule a new lecture (Moderator only)
@@ -16,7 +37,7 @@ export async function scheduleLecture(req, res) {
 
     // 1. Check course exists
     const courseCheck = await client.query(
-      `SELECT id, department_id FROM courses 
+      `SELECT id, department_id, level, semester FROM courses 
        WHERE id = $1 AND is_active = true LIMIT 1`,
       [course_id],
     );
@@ -83,7 +104,9 @@ export async function scheduleLecture(req, res) {
          date, start_time, end_time, status, notes
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled', $8)
-       RETURNING *`,
+       RETURNING id, course_id, lecturer_id, venue_id, department_id,
+                 TO_CHAR(date, 'YYYY-MM-DD') AS date,
+                 start_time, end_time, status, notes, created_at, updated_at`,
       [
         course_id,
         lecturer_id,
@@ -97,6 +120,16 @@ export async function scheduleLecture(req, res) {
     );
 
     await client.query("COMMIT");
+    await clearStudentLecturesCache({
+      department_id,
+      level: courseCheck.rows[0].level,
+      semester: courseCheck.rows[0].semester,
+      dates: [date],
+    });
+    await clearVenueCache({
+      venue_ids: [venue_id],
+      dates: [date],
+    });
 
     return res.status(201).json({
       success: true,
@@ -194,8 +227,12 @@ export async function postponeLecture(req, res) {
 
     // 1. Check lecture exists and belongs to this lecturer
     const lectureCheck = await client.query(
-      `SELECT * FROM lectures 
-       WHERE id = $1 AND lecturer_id = $2 AND status IN ('scheduled', 'postponed')
+      `SELECT l.*, c.level, c.semester
+       FROM lectures l
+       JOIN courses c ON c.id = l.course_id
+       WHERE l.id = $1
+         AND l.lecturer_id = $2
+         AND l.status IN ('scheduled', 'postponed')
        LIMIT 1`,
       [lectureId, lecturer_id],
     );
@@ -249,11 +286,23 @@ export async function postponeLecture(req, res) {
            status = 'postponed',
            updated_at = NOW()
        WHERE id = $6
-       RETURNING *`,
+       RETURNING id, course_id, lecturer_id, venue_id, department_id,
+                 TO_CHAR(date, 'YYYY-MM-DD') AS date,
+                 start_time, end_time, status, notes, created_at, updated_at`,
       [newDate, newStart, newEnd, newVenue, notes, lectureId],
     );
 
     await client.query("COMMIT");
+    await clearStudentLecturesCache({
+      department_id: current.department_id,
+      level: current.level,
+      semester: current.semester,
+      dates: [current.date, newDate],
+    });
+    await clearVenueCache({
+      venue_ids: [current.venue_id, newVenue],
+      dates: [current.date, newDate],
+    });
 
     return res.status(200).json({
       success: true,
@@ -285,10 +334,17 @@ export async function cancelLecture(req, res) {
       `UPDATE lectures
        SET status = 'cancelled',
            updated_at = NOW()
-       WHERE id = $1 
-         AND lecturer_id = $2 
-         AND status IN ('scheduled', 'postponed')
-       RETURNING *`,
+       FROM courses c
+       WHERE lectures.course_id = c.id
+         AND lectures.id = $1
+         AND lectures.lecturer_id = $2
+         AND lectures.status IN ('scheduled', 'postponed')
+       RETURNING lectures.id, lectures.course_id, lectures.lecturer_id,
+                 lectures.venue_id, lectures.department_id,
+                 TO_CHAR(lectures.date, 'YYYY-MM-DD') AS date,
+                 lectures.start_time, lectures.end_time, lectures.status,
+                 lectures.notes, lectures.created_at, lectures.updated_at,
+                 c.level, c.semester`,
       [lectureId, lecturer_id],
     );
 
@@ -298,6 +354,17 @@ export async function cancelLecture(req, res) {
         message: "Lecture not found or you don't have permission to cancel it",
       });
     }
+
+    await clearStudentLecturesCache({
+      department_id: result.rows[0].department_id,
+      level: result.rows[0].level,
+      semester: result.rows[0].semester,
+      dates: [result.rows[0].date],
+    });
+    await clearVenueCache({
+      venue_ids: [result.rows[0].venue_id],
+      dates: [result.rows[0].date],
+    });
 
     return res.status(200).json({
       success: true,
@@ -315,26 +382,32 @@ export async function cancelLecture(req, res) {
 
 /**
  * Get lectures created by the logged-in lecturer
- * Automatically marks past lectures as "completed"
+ * Adds live_status using the app timezone instead of the database timezone.
  */
 export async function getMyLectures(req, res) {
   try {
     const lecturer_id = req.session.user.id;
     const { status, upcoming } = req.query;
+    const now = getCampusDateTime();
 
     let query = `
-      SELECT 
+      SELECT
          l.id,
-         l.date,
+         TO_CHAR(l.date, 'YYYY-MM-DD') AS date,
          l.start_time,
          l.end_time,
-         CASE 
+         l.status,
+         CASE
            WHEN l.status IN ('scheduled', 'postponed')
-                AND (l.date < CURRENT_DATE 
-                     OR (l.date = CURRENT_DATE AND l.end_time < CURRENT_TIME))
+                AND l.date = $2::date
+                AND l.start_time <= $3::time
+                AND l.end_time > $3::time
+           THEN 'ongoing'
+           WHEN l.status IN ('scheduled', 'postponed')
+                AND (l.date < $2::date OR (l.date = $2::date AND l.end_time < $3::time))
            THEN 'completed'
-           ELSE l.status
-         END AS status,
+           ELSE l.status::text
+         END AS live_status,
          l.notes,
          l.created_at,
          l.updated_at,
@@ -348,10 +421,9 @@ export async function getMyLectures(req, res) {
        WHERE l.lecturer_id = $1
     `;
 
-    const values = [lecturer_id];
-    let paramIndex = 2;
+    const values = [lecturer_id, now.date, now.time];
+    let paramIndex = 4;
 
-    // Filter by status
     if (status) {
       const allowedStatuses = [
         "scheduled",
@@ -366,15 +438,13 @@ export async function getMyLectures(req, res) {
         });
       }
 
-      // Special handling for "completed" filter
       if (status === "completed") {
         query += `
           AND (
             l.status = 'completed'
             OR (
               l.status IN ('scheduled', 'postponed')
-              AND (l.date < CURRENT_DATE 
-                   OR (l.date = CURRENT_DATE AND l.end_time < CURRENT_TIME))
+              AND (l.date < $2::date OR (l.date = $2::date AND l.end_time < $3::time))
             )
           )
         `;
@@ -385,12 +455,11 @@ export async function getMyLectures(req, res) {
       }
     }
 
-    // Filter only upcoming lectures
     if (upcoming === "true") {
       query += `
         AND (
-          l.date > CURRENT_DATE 
-          OR (l.date = CURRENT_DATE AND l.end_time > CURRENT_TIME)
+          l.date > $2::date
+          OR (l.date = $2::date AND l.end_time > $3::time)
         )
         AND l.status IN ('scheduled', 'postponed')
       `;
@@ -402,6 +471,8 @@ export async function getMyLectures(req, res) {
 
     return res.status(200).json({
       success: true,
+      checked_at_date: now.date,
+      checked_at_time: now.time,
       count: result.rows.length,
       lectures: result.rows,
     });
@@ -413,3 +484,8 @@ export async function getMyLectures(req, res) {
     });
   }
 }
+
+
+
+
+

@@ -1,0 +1,66 @@
+import { createClient } from "redis";
+
+const cacheUrl = process.env.VALKEY_URL || process.env.REDIS_URL;
+let clientPromise;
+
+async function getCacheClient() {
+  if (!cacheUrl) return null;
+
+  if (!clientPromise) {
+    const client = createClient({ url: cacheUrl });
+
+    client.on("error", (err) => {
+      console.error("Valkey cache error:", err.message);
+    });
+
+    clientPromise = client.connect().then(() => client).catch((err) => {
+      clientPromise = null;
+      console.error("Valkey cache unavailable:", err.message);
+      return null;
+    });
+  }
+
+  return clientPromise;
+}
+
+export async function getJsonCache(key) {
+  try {
+    const client = await getCacheClient();
+    if (!client) return null;
+
+    const value = await client.get(key);
+    if (!value) return null;
+
+    return JSON.parse(value);
+  } catch (err) {
+    console.error("getJsonCache error:", err.message);
+    return null;
+  }
+}
+
+export async function setJsonCache(key, value, ttlSeconds) {
+  try {
+    const client = await getCacheClient();
+    if (!client) return false;
+
+    await client.setEx(key, ttlSeconds, JSON.stringify(value));
+    return true;
+  } catch (err) {
+    console.error("setJsonCache error:", err.message);
+    return false;
+  }
+}
+
+export async function deleteCacheKeys(keys) {
+  try {
+    const client = await getCacheClient();
+    const uniqueKeys = [...new Set(keys.filter(Boolean))];
+    if (!client || uniqueKeys.length === 0) return false;
+
+    await client.del(uniqueKeys);
+    return true;
+  } catch (err) {
+    console.error("deleteCacheKeys error:", err.message);
+    return false;
+  }
+}

@@ -8,6 +8,7 @@ import pool from "./Database/db.js";
 import adminRoutes from "./Routes/admin.routes.js";
 import profileRoutes from "./Routes/profile.routes.js";
 import lectureRoutes from "./Routes/lecture.routes.js";
+import studentRoutes from "./Routes/student.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
@@ -48,6 +49,7 @@ app.get("/health", (req, res) => {
 app.use("/auth", authRoute);
 app.use("/admin", adminRoutes);
 app.use("/profile", profileRoutes);
+app.use("/student", studentRoutes);
 
 app.use("/lectures", lectureRoutes);
 
@@ -57,3 +59,4 @@ void pool;
 app.listen(PORT, () => {
   console.log("Server active on", PORT);
 });
+
