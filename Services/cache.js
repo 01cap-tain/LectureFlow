@@ -1,31 +1,8 @@
-import { createClient } from "redis";
-
-const cacheUrl = process.env.VALKEY_URL || process.env.REDIS_URL;
-let clientPromise;
-
-async function getCacheClient() {
-  if (!cacheUrl) return null;
-
-  if (!clientPromise) {
-    const client = createClient({ url: cacheUrl });
-
-    client.on("error", (err) => {
-      console.error("Valkey cache error:", err.message);
-    });
-
-    clientPromise = client.connect().then(() => client).catch((err) => {
-      clientPromise = null;
-      console.error("Valkey cache unavailable:", err.message);
-      return null;
-    });
-  }
-
-  return clientPromise;
-}
+import { getValkeyClient } from "./valkey.js";
 
 export async function getJsonCache(key) {
   try {
-    const client = await getCacheClient();
+    const client = await getValkeyClient();
     if (!client) return null;
 
     const value = await client.get(key);
@@ -40,7 +17,7 @@ export async function getJsonCache(key) {
 
 export async function setJsonCache(key, value, ttlSeconds) {
   try {
-    const client = await getCacheClient();
+    const client = await getValkeyClient();
     if (!client) return false;
 
     await client.setEx(key, ttlSeconds, JSON.stringify(value));
@@ -53,7 +30,7 @@ export async function setJsonCache(key, value, ttlSeconds) {
 
 export async function deleteCacheKeys(keys) {
   try {
-    const client = await getCacheClient();
+    const client = await getValkeyClient();
     const uniqueKeys = [...new Set(keys.filter(Boolean))];
     if (!client || uniqueKeys.length === 0) return false;
 

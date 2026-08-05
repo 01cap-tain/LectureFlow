@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth } from "../Middleware/user-middleware.js";
+import { profileUpdateRateLimit } from "../Middleware/rate-limit.middleware.js";
 import {
   validateCompleteProfile,
   validateUpdateProfile,
@@ -21,6 +22,12 @@ router.patch(
   completeProfile,
 );
 
-router.patch("/update", requireAuth, validateUpdateProfile, updateProfile);
+router.patch(
+  "/update",
+  requireAuth,
+  profileUpdateRateLimit,
+  validateUpdateProfile,
+  updateProfile,
+);
 
 export default router;

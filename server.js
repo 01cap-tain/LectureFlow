@@ -9,16 +9,18 @@ import adminRoutes from "./Routes/admin.routes.js";
 import profileRoutes from "./Routes/profile.routes.js";
 import lectureRoutes from "./Routes/lecture.routes.js";
 import studentRoutes from "./Routes/student.routes.js";
+import { RedisStore } from "connect-redis";
+import { getValkeyClient } from "./Services/valkey.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
+const sessionClient = await getValkeyClient({ required: true });
 
 app.use(
   cors({
     origin: process.env.CLIENT_URL || true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
@@ -28,8 +30,9 @@ app.use(cookieParser());
 
 app.use(
   session({
+    store: new RedisStore({ client: sessionClient }),
     name: "lectureflow.sid",
-    secret: process.env.SESSION_SECRET || "dev-only-change-me",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -59,4 +62,3 @@ void pool;
 app.listen(PORT, () => {
   console.log("Server active on", PORT);
 });
-

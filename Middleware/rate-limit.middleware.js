@@ -57,4 +57,8 @@ export const lecturerWriteRateLimit = simpleRateLimit({
   max: 30,
 });
 
-
+export const profileUpdateRateLimit = simpleRateLimit({
+  name: "profile-update",
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 2,
+});

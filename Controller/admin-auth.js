@@ -1,5 +1,35 @@
 import argon2 from "argon2";
 import pool from "../Database/db.js";
+import { getJsonCache, setJsonCache } from "../Services/cache.js";
+import { adminCacheKeys, clearAdminListCache } from "../Services/adminCache.js";
+
+const ADMIN_LIST_CACHE_TTL = Number(process.env.ADMIN_LIST_CACHE_TTL || 300);
+
+async function sendCachedList(res, cacheKey, payloadName, query, values = []) {
+  const cached = await getJsonCache(cacheKey);
+
+  if (cached) {
+    return res.status(200).json({
+      success: true,
+      source: "cache",
+      ...cached,
+    });
+  }
+
+  const result = await pool.query(query, values);
+  const payload = {
+    count: result.rows.length,
+    [payloadName]: result.rows,
+  };
+
+  await setJsonCache(cacheKey, payload, ADMIN_LIST_CACHE_TTL);
+
+  return res.status(200).json({
+    success: true,
+    source: "database",
+    ...payload,
+  });
+}
 
 /**
  * Create a new Admin
@@ -30,6 +60,8 @@ async function createAdmin(req, res) {
       [name, email, password_hash],
     );
 
+    await clearAdminListCache([adminCacheKeys.admins]);
+
     return res.status(201).json({
       success: true,
       message: "Admin created successfully",
@@ -53,7 +85,6 @@ async function createLecturer(req, res) {
   try {
     const password_hash = await argon2.hash(password);
 
-    // Check if department exists
     const deptCheck = await pool.query(
       `SELECT id FROM departments WHERE id = $1 AND is_active = true LIMIT 1`,
       [department_id],
@@ -84,6 +115,8 @@ async function createLecturer(req, res) {
        RETURNING id, name, email, role, department_id, is_active, created_at`,
       [name, email, password_hash, department_id],
     );
+
+    await clearAdminListCache([adminCacheKeys.lecturers]);
 
     return res.status(201).json({
       success: true,
@@ -125,6 +158,8 @@ async function createFaculty(req, res) {
       [name],
     );
 
+    await clearAdminListCache([adminCacheKeys.faculties]);
+
     return res.status(201).json({
       success: true,
       message: "Faculty created successfully",
@@ -146,7 +181,6 @@ async function createDepartment(req, res) {
   const { name, faculty_id } = req.body;
 
   try {
-    // Check faculty exists
     const facultyCheck = await pool.query(
       `SELECT id FROM faculties WHERE id = $1 AND is_active = true LIMIT 1`,
       [faculty_id],
@@ -178,6 +212,8 @@ async function createDepartment(req, res) {
       [name, faculty_id],
     );
 
+    await clearAdminListCache([adminCacheKeys.departments]);
+
     return res.status(201).json({
       success: true,
       message: "Department created successfully",
@@ -207,7 +243,6 @@ async function createCourse(req, res) {
   } = req.body;
 
   try {
-    // Check department exists
     const deptCheck = await pool.query(
       `SELECT id FROM departments WHERE id = $1 AND is_active = true LIMIT 1`,
       [department_id],
@@ -220,7 +255,6 @@ async function createCourse(req, res) {
       });
     }
 
-    // Check for duplicate course code in the same academic year + semester
     const existing = await pool.query(
       `SELECT id FROM courses 
        WHERE course_code = $1 AND academic_year = $2 AND semester = $3
@@ -244,6 +278,8 @@ async function createCourse(req, res) {
       [course_code, title, department_id, level, semester, type, academic_year],
     );
 
+    await clearAdminListCache([adminCacheKeys.courses]);
+
     return res.status(201).json({
       success: true,
       message: "Course created successfully",
@@ -265,7 +301,6 @@ async function createVenue(req, res) {
   const { name, location, capacity } = req.body;
 
   try {
-    // Check if venue name already exists
     const existing = await pool.query(
       `SELECT id FROM venues WHERE LOWER(name) = LOWER($1) LIMIT 1`,
       [name],
@@ -285,6 +320,8 @@ async function createVenue(req, res) {
       [name, location, capacity],
     );
 
+    await clearAdminListCache([adminCacheKeys.venues]);
+
     return res.status(201).json({
       success: true,
       message: "Venue created successfully",
@@ -298,6 +335,112 @@ async function createVenue(req, res) {
     });
   }
 }
+
+async function listAdmins(req, res) {
+  try {
+    return sendCachedList(
+      res,
+      adminCacheKeys.admins,
+      "admins",
+      `SELECT id, name, email, role, is_active, created_at
+       FROM users
+       WHERE role = 'admin'
+       ORDER BY created_at DESC`,
+    );
+  } catch (err) {
+    console.error("listAdmins error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch admins" });
+  }
+}
+
+async function listLecturers(req, res) {
+  try {
+    return sendCachedList(
+      res,
+      adminCacheKeys.lecturers,
+      "lecturers",
+      `SELECT u.id, u.name, u.email, u.role, u.department_id,
+              d.name AS department_name, u.is_active, u.created_at
+       FROM users u
+       LEFT JOIN departments d ON d.id = u.department_id
+       WHERE u.role = 'moderator'
+       ORDER BY u.created_at DESC`,
+    );
+  } catch (err) {
+    console.error("listLecturers error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch lecturers" });
+  }
+}
+
+async function listFaculties(req, res) {
+  try {
+    return sendCachedList(
+      res,
+      adminCacheKeys.faculties,
+      "faculties",
+      `SELECT id, name, is_active, created_at, updated_at
+       FROM faculties
+       ORDER BY name ASC`,
+    );
+  } catch (err) {
+    console.error("listFaculties error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch faculties" });
+  }
+}
+
+async function listDepartments(req, res) {
+  try {
+    return sendCachedList(
+      res,
+      adminCacheKeys.departments,
+      "departments",
+      `SELECT d.id, d.name, d.faculty_id, f.name AS faculty_name,
+              d.is_active, d.created_at, d.updated_at
+       FROM departments d
+       JOIN faculties f ON f.id = d.faculty_id
+       ORDER BY d.name ASC`,
+    );
+  } catch (err) {
+    console.error("listDepartments error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch departments" });
+  }
+}
+
+async function listCourses(req, res) {
+  try {
+    return sendCachedList(
+      res,
+      adminCacheKeys.courses,
+      "courses",
+      `SELECT c.id, c.course_code, c.title, c.department_id,
+              d.name AS department_name, c.level, c.semester, c.type,
+              c.academic_year, c.is_active, c.created_at, c.updated_at
+       FROM courses c
+       JOIN departments d ON d.id = c.department_id
+       ORDER BY c.level ASC, c.course_code ASC`,
+    );
+  } catch (err) {
+    console.error("listCourses error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch courses" });
+  }
+}
+
+async function listVenues(req, res) {
+  try {
+    return sendCachedList(
+      res,
+      adminCacheKeys.venues,
+      "venues",
+      `SELECT id, name, location, capacity, is_active, created_at, updated_at
+       FROM venues
+       ORDER BY name ASC`,
+    );
+  } catch (err) {
+    console.error("listVenues error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch venues" });
+  }
+}
+
 export {
   createAdmin,
   createLecturer,
@@ -305,4 +448,10 @@ export {
   createDepartment,
   createCourse,
   createVenue,
+  listAdmins,
+  listLecturers,
+  listFaculties,
+  listDepartments,
+  listCourses,
+  listVenues,
 };

@@ -181,4 +181,35 @@ export function requireRole(...roles) {
     return next();
   };
 }
+/**
+ * Public forgot-password validation. User cannot be logged in yet.
+ */
+export function validateForgotPassword(req, res, next) {
+  try {
+    const email =
+      typeof req.body?.email === "string" ? req.body.email.trim() : "";
+    const errors = [];
+
+    if (!email) {
+      errors.push("Email is required");
+    } else if (!validator.isEmail(email)) {
+      errors.push("Invalid email address");
+    } else if (!validator.isLength(email, { max: 255 })) {
+      errors.push("Email must be at most 255 characters");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    req.body.email = validator.normalizeEmail(email) || email.toLowerCase();
+    return next();
+  } catch (err) {
+    console.error("validateForgotPassword error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Validation failed",
+    });
+  }
+}
 

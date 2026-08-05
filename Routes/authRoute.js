@@ -1,6 +1,12 @@
 import express from "express";
-import { SignUp, SignIn, SignOut } from "../Controller/user-auth.js";
 import {
+  ForgotPassword,
+  SignUp,
+  SignIn,
+  SignOut,
+} from "../Controller/user-auth.js";
+import {
+  validateForgotPassword,
   validateSignUp,
   validateSignIn,
   requireAuth,
@@ -14,6 +20,14 @@ router.post("/signup", authRateLimit, validateSignUp, SignUp);
 
 // All roles: admin | moderator | student
 router.post("/signin", authRateLimit, validateSignIn, SignIn);
+
+// Public route: user is not logged in because they forgot their password.
+router.post(
+  "/forgot-password",
+  authRateLimit,
+  validateForgotPassword,
+  ForgotPassword,
+);
 
 // Authenticated users only
 router.post("/signout", requireAuth, SignOut);
