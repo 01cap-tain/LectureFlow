@@ -9,7 +9,6 @@ import { sendPasswordResetEmail } from "../Services/email.service.js";
 const PASSWORD_RESET_TTL_SECONDS = Number(
   process.env.PASSWORD_RESET_TTL_SECONDS || 15 * 60,
 );
-console.log(process.env.PASSWORD_RESET_TTL_SECONDS);
 const FORGOT_PASSWORD_MESSAGE =
   "If the email exists, a password reset link has been sent.";
 

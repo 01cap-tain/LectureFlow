@@ -1,36 +1,7 @@
 import argon2 from "argon2";
 import pool from "../Database/db.js";
-import { getJsonCache, setJsonCache } from "../Services/cache.js";
-import { adminCacheKeys, clearAdminListCache } from "../Services/adminCache.js";
-
-const ADMIN_LIST_CACHE_TTL = Number(process.env.ADMIN_LIST_CACHE_TTL || 300);
-
-async function sendCachedList(res, cacheKey, payloadName, query, values = []) {
-  const cached = await getJsonCache(cacheKey);
-
-  if (cached) {
-    return res.status(200).json({
-      success: true,
-      source: "cache",
-      ...cached,
-    });
-  }
-
-  const result = await pool.query(query, values);
-  const payload = {
-    count: result.rows.length,
-    [payloadName]: result.rows,
-  };
-
-  await setJsonCache(cacheKey, payload, ADMIN_LIST_CACHE_TTL);
-
-  return res.status(200).json({
-    success: true,
-    source: "database",
-    ...payload,
-  });
-}
-
+import { clearStudentLecturesCache } from "../Services/studentLectureCache.js";
+import { clearVenueCache } from "../Services/venueCache.js";
 /**
  * Create a new Admin
  * Only existing Admin can call this
@@ -59,8 +30,6 @@ async function createAdmin(req, res) {
        RETURNING id, name, email, role, is_active, created_at`,
       [name, email, password_hash],
     );
-
-    await clearAdminListCache([adminCacheKeys.admins]);
 
     return res.status(201).json({
       success: true,
@@ -116,8 +85,6 @@ async function createLecturer(req, res) {
       [name, email, password_hash, department_id],
     );
 
-    await clearAdminListCache([adminCacheKeys.lecturers]);
-
     return res.status(201).json({
       success: true,
       message: "Lecturer created successfully",
@@ -157,8 +124,6 @@ async function createFaculty(req, res) {
        RETURNING id, name, is_active, created_at`,
       [name],
     );
-
-    await clearAdminListCache([adminCacheKeys.faculties]);
 
     return res.status(201).json({
       success: true,
@@ -211,8 +176,6 @@ async function createDepartment(req, res) {
        RETURNING id, name, faculty_id, is_active, created_at`,
       [name, faculty_id],
     );
-
-    await clearAdminListCache([adminCacheKeys.departments]);
 
     return res.status(201).json({
       success: true,
@@ -278,8 +241,6 @@ async function createCourse(req, res) {
       [course_code, title, department_id, level, semester, type, academic_year],
     );
 
-    await clearAdminListCache([adminCacheKeys.courses]);
-
     return res.status(201).json({
       success: true,
       message: "Course created successfully",
@@ -320,8 +281,6 @@ async function createVenue(req, res) {
       [name, location, capacity],
     );
 
-    await clearAdminListCache([adminCacheKeys.venues]);
-
     return res.status(201).json({
       success: true,
       message: "Venue created successfully",
@@ -338,15 +297,14 @@ async function createVenue(req, res) {
 
 async function listAdmins(req, res) {
   try {
-    return sendCachedList(
-      res,
-      adminCacheKeys.admins,
-      "admins",
+    const result = await pool.query(
       `SELECT id, name, email, role, is_active, created_at
        FROM users
        WHERE role = 'admin'
        ORDER BY created_at DESC`,
     );
+
+    return res.status(200).json({ success: true, count: result.rows.length, admins: result.rows });
   } catch (err) {
     console.error("listAdmins error:", err);
     return res.status(500).json({ success: false, message: "Could not fetch admins" });
@@ -355,10 +313,7 @@ async function listAdmins(req, res) {
 
 async function listLecturers(req, res) {
   try {
-    return sendCachedList(
-      res,
-      adminCacheKeys.lecturers,
-      "lecturers",
+    const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.role, u.department_id,
               d.name AS department_name, u.is_active, u.created_at
        FROM users u
@@ -366,6 +321,8 @@ async function listLecturers(req, res) {
        WHERE u.role = 'moderator'
        ORDER BY u.created_at DESC`,
     );
+
+    return res.status(200).json({ success: true, count: result.rows.length, lecturers: result.rows });
   } catch (err) {
     console.error("listLecturers error:", err);
     return res.status(500).json({ success: false, message: "Could not fetch lecturers" });
@@ -374,14 +331,13 @@ async function listLecturers(req, res) {
 
 async function listFaculties(req, res) {
   try {
-    return sendCachedList(
-      res,
-      adminCacheKeys.faculties,
-      "faculties",
+    const result = await pool.query(
       `SELECT id, name, is_active, created_at, updated_at
        FROM faculties
        ORDER BY name ASC`,
     );
+
+    return res.status(200).json({ success: true, count: result.rows.length, faculties: result.rows });
   } catch (err) {
     console.error("listFaculties error:", err);
     return res.status(500).json({ success: false, message: "Could not fetch faculties" });
@@ -390,16 +346,15 @@ async function listFaculties(req, res) {
 
 async function listDepartments(req, res) {
   try {
-    return sendCachedList(
-      res,
-      adminCacheKeys.departments,
-      "departments",
+    const result = await pool.query(
       `SELECT d.id, d.name, d.faculty_id, f.name AS faculty_name,
               d.is_active, d.created_at, d.updated_at
        FROM departments d
        JOIN faculties f ON f.id = d.faculty_id
        ORDER BY d.name ASC`,
     );
+
+    return res.status(200).json({ success: true, count: result.rows.length, departments: result.rows });
   } catch (err) {
     console.error("listDepartments error:", err);
     return res.status(500).json({ success: false, message: "Could not fetch departments" });
@@ -408,10 +363,7 @@ async function listDepartments(req, res) {
 
 async function listCourses(req, res) {
   try {
-    return sendCachedList(
-      res,
-      adminCacheKeys.courses,
-      "courses",
+    const result = await pool.query(
       `SELECT c.id, c.course_code, c.title, c.department_id,
               d.name AS department_name, c.level, c.semester, c.type,
               c.academic_year, c.is_active, c.created_at, c.updated_at
@@ -419,6 +371,8 @@ async function listCourses(req, res) {
        JOIN departments d ON d.id = c.department_id
        ORDER BY c.level ASC, c.course_code ASC`,
     );
+
+    return res.status(200).json({ success: true, count: result.rows.length, courses: result.rows });
   } catch (err) {
     console.error("listCourses error:", err);
     return res.status(500).json({ success: false, message: "Could not fetch courses" });
@@ -427,20 +381,134 @@ async function listCourses(req, res) {
 
 async function listVenues(req, res) {
   try {
-    return sendCachedList(
-      res,
-      adminCacheKeys.venues,
-      "venues",
+    const result = await pool.query(
       `SELECT id, name, location, capacity, is_active, created_at, updated_at
        FROM venues
        ORDER BY name ASC`,
     );
+
+    return res.status(200).json({ success: true, count: result.rows.length, venues: result.rows });
   } catch (err) {
     console.error("listVenues error:", err);
     return res.status(500).json({ success: false, message: "Could not fetch venues" });
   }
 }
 
+async function deleteUser(req, res) {
+  const userId = Number(req.params.id);
+
+  try {
+    if (userId === req.session.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot deactivate your own account",
+      });
+    }
+
+    // Soft delete keeps old lecture history and avoids foreign-key failures.
+    const result = await pool.query(
+      `UPDATE users
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND role IN ('student', 'moderator') AND is_active = true
+       RETURNING id, name, email, role, department_id, matric_no, is_active`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found or already inactive",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User deactivated successfully",
+      user: result.rows[0],
+    });
+  } catch (err) {
+    console.error("deleteUser error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate user" });
+  }
+}
+
+async function deleteLecturer(req, res) {
+  const lecturerId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND role = 'moderator' AND is_active = true
+       RETURNING id, name, email, role, department_id, is_active`,
+      [lecturerId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Lecturer not found or already inactive",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecturer deactivated successfully",
+      lecturer: result.rows[0],
+    });
+  } catch (err) {
+    console.error("deleteLecturer error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate lecturer" });
+  }
+}
+
+async function deleteLecture(req, res) {
+  const lectureId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE lectures
+       SET status = 'cancelled', updated_at = NOW()
+       FROM courses c
+       WHERE lectures.course_id = c.id
+         AND lectures.id = $1
+         AND lectures.status IN ('scheduled', 'postponed')
+       RETURNING lectures.id, lectures.course_id, lectures.lecturer_id,
+                 lectures.venue_id, lectures.department_id,
+                 TO_CHAR(lectures.date, 'YYYY-MM-DD') AS date,
+                 lectures.start_time, lectures.end_time, lectures.status,
+                 lectures.notes, lectures.updated_at, c.level, c.semester`,
+      [lectureId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Lecture not found or already inactive",
+      });
+    }
+
+    await clearStudentLecturesCache({
+      department_id: result.rows[0].department_id,
+      level: result.rows[0].level,
+      semester: result.rows[0].semester,
+      dates: [result.rows[0].date],
+    });
+    await clearVenueCache({
+      venue_ids: [result.rows[0].venue_id],
+      dates: [result.rows[0].date],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecture cancelled successfully",
+      lecture: result.rows[0],
+    });
+  } catch (err) {
+    console.error("deleteLecture error:", err);
+    return res.status(500).json({ success: false, message: "Could not cancel lecture" });
+  }
+}
 export {
   createAdmin,
   createLecturer,
@@ -454,4 +522,14 @@ export {
   listDepartments,
   listCourses,
   listVenues,
+  deleteUser,
+  deleteLecturer,
+  deleteLecture,
 };
+
+
+
+
+
+
+

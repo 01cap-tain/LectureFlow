@@ -281,3 +281,26 @@ export function validateCreateVenue(req, res, next) {
       .json({ success: false, message: "Validation failed" });
   }
 }
+/**
+ * Validate numeric id params used by admin delete routes.
+ */
+export function validateAdminIdParam(req, res, next) {
+  try {
+    const id = Number(req.params?.id);
+
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["id must be a positive number"],
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("validateAdminIdParam error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}
+

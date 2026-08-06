@@ -8,6 +8,9 @@ import {
   createLecturer,
   createCourse,
   createVenue,
+  deleteUser,
+  deleteLecturer,
+  deleteLecture,
   listAdmins,
   listCourses,
   listDepartments,
@@ -17,6 +20,7 @@ import {
 } from "../Controller/admin-auth.js";
 
 import {
+  validateAdminIdParam,
   validateCreateAdmin,
   validateCreateDepartment,
   validateCreateFaculty,
@@ -34,6 +38,32 @@ router.get("/faculties", requireAuth, requireRole("admin"), listFaculties);
 router.get("/departments", requireAuth, requireRole("admin"), listDepartments);
 router.get("/courses", requireAuth, requireRole("admin"), listCourses);
 router.get("/venues", requireAuth, requireRole("admin"), listVenues);
+
+// Remove active users from the system without breaking lecture history.
+router.delete(
+  "/users/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteUser,
+);
+
+router.delete(
+  "/lecturers/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteLecturer,
+);
+
+// Schedules are cancelled, not hard-deleted, to preserve audit/history.
+router.delete(
+  "/lectures/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteLecture,
+);
 
 // Create Admin
 router.post(
