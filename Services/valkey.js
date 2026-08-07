@@ -18,16 +18,16 @@ function logValkeyError(message) {
 function startKeepAlive(client) {
   if (keepAliveTimer) return;
 
-  // A tiny ping keeps some managed TLS connections from going idle.
+  // A tiny ping keeps managed TLS connections warm during quiet periods.
   keepAliveTimer = setInterval(async () => {
-    if (!client.isOpen) return;
+    if (!client.isReady) return;
 
     try {
       await client.ping();
     } catch (err) {
       logValkeyError(err.message);
     }
-  }, Number(process.env.VALKEY_PING_INTERVAL_MS || 4 * 60 * 1000));
+  }, Number(process.env.VALKEY_PING_INTERVAL_MS || 60 * 1000));
 
   keepAliveTimer.unref?.();
 }
@@ -44,14 +44,19 @@ export async function getValkeyClient({ required = false } = {}) {
       socket: {
         connectTimeout: 10000,
         reconnectStrategy(retries) {
-          if (retries > 10) return false;
-          return Math.min(retries * 250, 3000);
+          // Never return false here. Sessions need this client to recover after
+          // temporary Aiven/network socket resets instead of closing forever.
+          return Math.min(retries * 250, 5000);
         },
       },
     });
 
     client.on("error", (err) => {
       logValkeyError(err.message);
+    });
+
+    client.on("end", () => {
+      logValkeyError("connection ended; reconnecting when Redis client allows it");
     });
 
     clientPromise = client

@@ -14,7 +14,7 @@ import { getValkeyClient } from "./Services/valkey.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
-const sessionClient = await getValkeyClient({ required: true });
+const sessionClient = await getValkeyClient();
 
 app.use(
   cors({
@@ -28,21 +28,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(
-  session({
-    store: new RedisStore({ client: sessionClient }),
-    name: "lectureflow.sid",
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-    },
-  }),
-);
+const sessionConfig = {
+  name: "lectureflow.sid",
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+  },
+};
+
+if (sessionClient?.isReady) {
+  sessionConfig.store = new RedisStore({ client: sessionClient });
+} else {
+  // Local fallback only: server can boot when Valkey is unavailable.
+  console.warn("Valkey session store unavailable. Using in-memory sessions.");
+}
+
+const sessionMiddleware = session(sessionConfig);
+
+app.use((req, res, next) => {
+  sessionMiddleware(req, res, (err) => {
+    if (!err) return next();
+
+    console.error("Session store error:", err.message);
+    return res.status(503).json({
+      success: false,
+      message: "Session service temporarily unavailable",
+    });
+  });
+});
 
 // Lightweight health check (must not touch the database)
 app.get("/health", (req, res) => {
@@ -62,4 +80,3 @@ void pool;
 app.listen(PORT, () => {
   console.log("Server active on", PORT);
 });
-
