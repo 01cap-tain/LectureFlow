@@ -1,7 +1,7 @@
 import argon2 from "argon2";
 import { createHash, randomBytes } from "node:crypto";
 import pool from "../Database/db.js";
-import { resolveDepartmentFromMatric } from "../Services/departmentFromMatric.js";
+import { extractDepartmentCodeFromMatric } from "../Services/departmentFromMatric.js";
 import { deleteCacheKeys, setJsonCache } from "../Services/cache.js";
 import { sendPasswordResetEmail } from "../Services/email.service.js";
 
@@ -90,18 +90,16 @@ function destroySessionCache(req, res) {
 async function SignUp(req, res) {
   const { email, matric_no, password } = req.body;
 
-  // 1. Resolve department from matric number early
-  const resolved = resolveDepartmentFromMatric(matric_no);
+  // 1. Extract matric department code; DB stores the actual code -> department mapping.
+  const department_code = extractDepartmentCodeFromMatric(matric_no);
 
-  if (!resolved) {
+  if (!department_code) {
     return res.status(400).json({
       success: false,
       message:
-        "Could not detect department from matric number. Please check your matric number.",
+        "Could not detect department code from matric number. Please check your matric number.",
     });
   }
-
-  const department_name = resolved.name;
 
   // 2. Hash password outside transaction
   let password_hash;
@@ -120,20 +118,23 @@ async function SignUp(req, res) {
   try {
     await client.query("BEGIN");
 
-    // 3. Check if department already exists (Admin must have created it)
+    // 3. Resolve matric code to an active department created by admin.
     const deptResult = await client.query(
-      `SELECT id, name
-       FROM departments
-       WHERE LOWER(name) = LOWER($1) AND is_active = TRUE
+      `SELECT d.id, d.name
+       FROM department_matric_codes dmc
+       JOIN departments d ON d.id = dmc.department_id
+       WHERE dmc.code = $1
+         AND dmc.is_active = TRUE
+         AND d.is_active = TRUE
        LIMIT 1`,
-      [department_name],
+      [department_code],
     );
 
     if (deptResult.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: `Department "${department_name}" is not set up yet. Please contact admin.`,
+        message: `Department code "${department_code}" is not set up yet. Please contact admin.`,
       });
     }
 
@@ -391,3 +392,4 @@ async function SignOut(req, res) {
 }
 
 export { ForgotPassword, SignUp, SignIn, SignOut };
+

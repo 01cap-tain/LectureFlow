@@ -361,6 +361,75 @@ async function listDepartments(req, res) {
   }
 }
 
+
+async function createDepartmentMatricCode(req, res) {
+  const { department_id, code } = req.body;
+
+  try {
+    const deptCheck = await pool.query(
+      `SELECT id FROM departments WHERE id = $1 AND is_active = true LIMIT 1`,
+      [department_id],
+    );
+
+    if (deptCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or inactive department",
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO department_matric_codes (department_id, code, is_active)
+       VALUES ($1, $2, true)
+       RETURNING id, department_id, code, is_active, created_at`,
+      [department_id, code],
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Department matric code created successfully",
+      department_matric_code: result.rows[0],
+    });
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "Matric code already exists",
+      });
+    }
+
+    console.error("createDepartmentMatricCode error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not create department matric code",
+    });
+  }
+}
+
+async function listDepartmentMatricCodes(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT dmc.id, dmc.department_id, d.name AS department_name,
+              dmc.code, dmc.is_active, dmc.created_at, dmc.updated_at
+       FROM department_matric_codes dmc
+       JOIN departments d ON d.id = dmc.department_id
+       ORDER BY dmc.code ASC`,
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      department_matric_codes: result.rows,
+    });
+  } catch (err) {
+    console.error("listDepartmentMatricCodes error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not fetch department matric codes",
+    });
+  }
+}
+
 async function listCourses(req, res) {
   try {
     const result = await pool.query(
@@ -520,12 +589,16 @@ export {
   listLecturers,
   listFaculties,
   listDepartments,
+  createDepartmentMatricCode,
+  listDepartmentMatricCodes,
   listCourses,
   listVenues,
   deleteUser,
   deleteLecturer,
   deleteLecture,
 };
+
+
 
 
 

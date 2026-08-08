@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from "../Middleware/user-middleware.js";
 import {
   createAdmin,
   createDepartment,
+  createDepartmentMatricCode,
   createFaculty,
   createLecturer,
   createCourse,
@@ -14,6 +15,7 @@ import {
   listAdmins,
   listCourses,
   listDepartments,
+  listDepartmentMatricCodes,
   listFaculties,
   listLecturers,
   listVenues,
@@ -23,6 +25,7 @@ import {
   validateAdminIdParam,
   validateCreateAdmin,
   validateCreateDepartment,
+  validateCreateDepartmentMatricCode,
   validateCreateFaculty,
   validateCreateLecturer,
   validateCreateCourse,
@@ -36,6 +39,12 @@ router.get("/admins", requireAuth, requireRole("admin"), listAdmins);
 router.get("/lecturers", requireAuth, requireRole("admin"), listLecturers);
 router.get("/faculties", requireAuth, requireRole("admin"), listFaculties);
 router.get("/departments", requireAuth, requireRole("admin"), listDepartments);
+router.get(
+  "/department-matric-codes",
+  requireAuth,
+  requireRole("admin"),
+  listDepartmentMatricCodes,
+);
 router.get("/courses", requireAuth, requireRole("admin"), listCourses);
 router.get("/venues", requireAuth, requireRole("admin"), listVenues);
 
@@ -99,6 +108,15 @@ router.post(
   requireRole("admin"),
   validateCreateDepartment,
   createDepartment,
+);
+
+// Create Department Matric Code
+router.post(
+  "/depart-matric-codes",
+  requireAuth,
+  requireRole("admin"),
+  validateCreateDepartmentMatricCode,
+  createDepartmentMatricCode,
 );
 
 // Create Course
