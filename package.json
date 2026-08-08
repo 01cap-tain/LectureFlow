@@ -5,8 +5,13 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
+    "migrate": "node-pg-migrate",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate:create": "node-pg-migrate create --migrations-dir Database/migrations",
+    "migrate:up": "node-pg-migrate up --migrations-dir Database/migrations",
+    "migrate:down": "node-pg-migrate down --migrations-dir Database/migrations",
+    "migrate:redo": "npm run migrate:down && npm run migrate:up"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +32,7 @@
     "validator": "^13.15.35"
   },
   "devDependencies": {
+    "node-pg-migrate": "^9.0.0",
     "nodemon": "^3.1.14"
   }
 }

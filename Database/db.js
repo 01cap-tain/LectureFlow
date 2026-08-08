@@ -1,4 +1,3 @@
-import fs from "fs/promises";
 import pkg from "pg";
 const { Pool } = pkg;
 
@@ -13,6 +12,5 @@ pool.on("error", (err) => {
   console.error("Neon connection went idle");
 });
 
-const sql = await fs.readFile("./Database/schema.sql", "utf8");
-await pool.query(sql);
 export default pool;
+

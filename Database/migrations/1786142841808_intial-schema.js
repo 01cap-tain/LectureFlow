@@ -1,5 +1,9 @@
-
-
+/**
+ * First database version for LectureFlow.
+ * This creates the current schema on a fresh database.
+ */
+export const up = (pgm) => {
+  pgm.sql(`
 -- ---------------------------------------------------------------------------
 -- Enums
 -- ---------------------------------------------------------------------------
@@ -208,3 +212,8 @@ CREATE TRIGGER trg_lectures_updated_at
   BEFORE UPDATE ON lectures
   FOR EACH ROW
   EXECUTE PROCEDURE set_updated_at();
+`);
+};
+
+// Do not auto-drop the whole project schema on rollback.
+export const down = false;
