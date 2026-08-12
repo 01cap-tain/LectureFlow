@@ -7,7 +7,7 @@ import { sendPasswordResetEmail } from "../Services/email.service.js";
 
 // AUTH CONTROLLER: student SignUp uses DB transaction + department from matric
 const PASSWORD_RESET_TTL_SECONDS = Number(
-  process.env.PASSWORD_RESET_TTL_SECONDS || 15 * 60,
+  process.env.PASSWORD_RESET_TTL_SECONDS,
 );
 const FORGOT_PASSWORD_MESSAGE =
   "If the email exists, a password reset link has been sent.";
@@ -392,4 +392,3 @@ async function SignOut(req, res) {
 }
 
 export { ForgotPassword, SignUp, SignIn, SignOut };
-

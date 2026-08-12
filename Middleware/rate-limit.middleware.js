@@ -1,13 +1,15 @@
 const buckets = new Map();
 
 function getClientKey(req) {
-  return req.session?.user?.id || req.ip || req.socket?.remoteAddress || "unknown";
+  return (
+    req.session?.user?.id || req.ip || req.socket?.remoteAddress || "unknown"
+  );
 }
 
 export function simpleRateLimit({ windowMs, max, name }) {
   return (req, res, next) => {
     // Keep testing easy: set RATE_LIMIT_ENABLED=false to skip all rate limits.
-    if (process.env.RATE_LIMIT_ENABLED === "false") {
+    if (process.env.RATE_LIMIT_ENABLED) {
       return next();
     }
 

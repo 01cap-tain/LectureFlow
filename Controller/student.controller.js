@@ -3,8 +3,8 @@ import { getJsonCache, setJsonCache } from "../Services/cache.js";
 import { getStudentLecturesCacheKey } from "../Services/studentLectureCache.js";
 import { getVenueQueueCacheKey } from "../Services/venueCache.js";
 
-const CACHE_TTL_SECONDS = Number(process.env.STUDENT_LECTURES_CACHE_TTL || 180);
-const VENUE_QUEUE_CACHE_TTL = Number(process.env.VENUE_QUEUE_CACHE_TTL || 120);
+const CACHE_TTL_SECONDS = Number(process.env.STUDENT_LECTURES_CACHE_TTL);
+const VENUE_QUEUE_CACHE_TTL = Number(process.env.VENUE_QUEUE_CACHE_TTL);
 
 function getCampusDateTime() {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -18,7 +18,9 @@ function getCampusDateTime() {
     hour12: false,
   }).formatToParts(new Date());
 
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
   return {
     date: `${values.year}-${values.month}-${values.day}`,
     time: `${values.hour}:${values.minute}:${values.second}`,
@@ -138,7 +140,9 @@ export async function getStudentLectures(req, res) {
 
 function minutesUntil(endTime, currentTime) {
   const [endHour, endMinute] = String(endTime).split(":").map(Number);
-  const [currentHour, currentMinute] = String(currentTime).split(":").map(Number);
+  const [currentHour, currentMinute] = String(currentTime)
+    .split(":")
+    .map(Number);
   const endTotal = endHour * 60 + endMinute;
   const currentTotal = currentHour * 60 + currentMinute;
   return Math.max(endTotal - currentTotal, 0);
@@ -266,6 +270,3 @@ export async function getVenueQueue(req, res) {
     });
   }
 }
-
-
-

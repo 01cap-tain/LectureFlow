@@ -1,6 +1,6 @@
 import { getValkeyClient } from "./valkey.js";
 
-const CACHE_PAUSE_MS = Number(process.env.CACHE_CIRCUIT_BREAKER_MS || 30000);
+const CACHE_PAUSE_MS = Number(process.env.CACHE_CIRCUIT_BREAKER_MS);
 let cachePausedUntil = 0;
 
 function isCachePaused() {

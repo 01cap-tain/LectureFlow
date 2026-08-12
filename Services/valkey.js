@@ -27,7 +27,7 @@ function startKeepAlive(client) {
     } catch (err) {
       logValkeyError(err.message);
     }
-  }, Number(process.env.VALKEY_PING_INTERVAL_MS || 60 * 1000));
+  }, Number(process.env.VALKEY_PING_INTERVAL_MS));
 
   keepAliveTimer.unref?.();
 }
@@ -56,7 +56,9 @@ export async function getValkeyClient({ required = false } = {}) {
     });
 
     client.on("end", () => {
-      logValkeyError("connection ended; reconnecting when Redis client allows it");
+      logValkeyError(
+        "connection ended; reconnecting when Redis client allows it",
+      );
     });
 
     clientPromise = client
