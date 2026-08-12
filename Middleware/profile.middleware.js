@@ -46,6 +46,7 @@ export function validateCompleteProfile(req, res, next) {
 export function validateUpdateProfile(req, res, next) {
   try {
     const name = req.body?.name;
+    const email = req.body?.email;
     const level = req.body?.level;
     const current_semester = req.body?.current_semester;
     const phone = req.body?.phone;
@@ -61,6 +62,14 @@ export function validateUpdateProfile(req, res, next) {
         errors.push("Name must be between 2 and 100 characters");
       } else {
         req.body.name = name.trim();
+      }
+    }
+
+    if (email !== undefined) {
+      if (typeof email !== "string" || !validator.isEmail(email.trim())) {
+        errors.push("Valid email is required");
+      } else {
+        req.body.email = email.trim().toLowerCase();
       }
     }
 

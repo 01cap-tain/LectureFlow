@@ -1,8 +1,9 @@
--- LectureFlow PostgreSQL schema (idempotent / safe to re-run)
--- Password reset tokens live in Valkey (not in the database).
--- Note: IF NOT EXISTS skips creation when the object already exists;
--- it does not alter an existing definition. Use migrations for changes.
-
+/**
+ * First database version for LectureFlow.
+ * This creates the current schema on a fresh database.
+ */
+export const up = (pgm) => {
+  pgm.sql(`
 -- ---------------------------------------------------------------------------
 -- Enums
 -- ---------------------------------------------------------------------------
@@ -211,3 +212,8 @@ CREATE TRIGGER trg_lectures_updated_at
   BEFORE UPDATE ON lectures
   FOR EACH ROW
   EXECUTE PROCEDURE set_updated_at();
+`);
+};
+
+// Do not auto-drop the whole project schema on rollback.
+export const down = false;

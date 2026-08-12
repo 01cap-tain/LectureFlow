@@ -1,19 +1,33 @@
 import express from "express";
-import { SignUp, SignIn, SignOut } from "../Controller/user-auth.js";
 import {
+  ForgotPassword,
+  SignUp,
+  SignIn,
+  SignOut,
+} from "../Controller/user-auth.js";
+import {
+  validateForgotPassword,
   validateSignUp,
   validateSignIn,
   requireAuth,
-  requireRole,
 } from "../Middleware/user-middleware.js";
+import { authRateLimit } from "../Middleware/rate-limit.middleware.js";
 
 const router = express.Router();
 
 // Student registration only (role forced to 'student' in controller)
-router.post("/signup", validateSignUp, SignUp);
+router.post("/signup", authRateLimit, validateSignUp, SignUp);
 
 // All roles: admin | moderator | student
-router.post("/signin", validateSignIn, SignIn);
+router.post("/signin", authRateLimit, validateSignIn, SignIn);
+
+// Public route: user is not logged in because they forgot their password.
+router.post(
+  "/forgot-password",
+  authRateLimit,
+  validateForgotPassword,
+  ForgotPassword,
+);
 
 // Authenticated users only
 router.post("/signout", requireAuth, SignOut);

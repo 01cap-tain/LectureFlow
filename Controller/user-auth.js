@@ -1,8 +1,30 @@
 import argon2 from "argon2";
+import { createHash, randomBytes } from "node:crypto";
 import pool from "../Database/db.js";
-import { resolveDepartmentFromMatric } from "../Services/departmentFromMatric.js";
+import { extractDepartmentCodeFromMatric } from "../Services/departmentFromMatric.js";
+import { deleteCacheKeys, setJsonCache } from "../Services/cache.js";
+import { sendPasswordResetEmail } from "../Services/email.service.js";
 
 // AUTH CONTROLLER: student SignUp uses DB transaction + department from matric
+const PASSWORD_RESET_TTL_SECONDS = Number(
+  process.env.PASSWORD_RESET_TTL_SECONDS || 15 * 60,
+);
+const FORGOT_PASSWORD_MESSAGE =
+  "If the email exists, a password reset link has been sent.";
+
+function hashResetToken(token) {
+  // Store only token hash in Valkey; plain token is sent by email only.
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function buildResetUrl(token) {
+  const baseUrl = process.env.RESET_PASSWORD_URL || process.env.CLIENT_URL;
+  if (!baseUrl) return null;
+
+  const url = new URL(baseUrl);
+  url.searchParams.set("token", token);
+  return url.toString();
+}
 
 /**
  * Safe user payload cached on the session (never includes password_hash).
@@ -68,18 +90,16 @@ function destroySessionCache(req, res) {
 async function SignUp(req, res) {
   const { email, matric_no, password } = req.body;
 
-  // 1. Resolve department from matric number early
-  const resolved = resolveDepartmentFromMatric(matric_no);
+  // 1. Extract matric department code; DB stores the actual code -> department mapping.
+  const department_code = extractDepartmentCodeFromMatric(matric_no);
 
-  if (!resolved) {
+  if (!department_code) {
     return res.status(400).json({
       success: false,
       message:
-        "Could not detect department from matric number. Please check your matric number.",
+        "Could not detect department code from matric number. Please check your matric number.",
     });
   }
-
-  const department_name = resolved.name;
 
   // 2. Hash password outside transaction
   let password_hash;
@@ -98,20 +118,23 @@ async function SignUp(req, res) {
   try {
     await client.query("BEGIN");
 
-    // 3. Check if department already exists (Admin must have created it)
+    // 3. Resolve matric code to an active department created by admin.
     const deptResult = await client.query(
-      `SELECT id, name
-       FROM departments
-       WHERE LOWER(name) = LOWER($1) AND is_active = TRUE
+      `SELECT d.id, d.name
+       FROM department_matric_codes dmc
+       JOIN departments d ON d.id = dmc.department_id
+       WHERE dmc.code = $1
+         AND dmc.is_active = TRUE
+         AND d.is_active = TRUE
        LIMIT 1`,
-      [department_name],
+      [department_code],
     );
 
     if (deptResult.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: `Department "${department_name}" is not set up yet. Please contact admin.`,
+        message: `Department code "${department_code}" is not set up yet. Please contact admin.`,
       });
     }
 
@@ -270,6 +293,85 @@ async function SignIn(req, res) {
 }
 
 /**
+ * Start password reset. This route is public and does not require login.
+ */
+async function ForgotPassword(req, res) {
+  const { email } = req.body;
+
+  try {
+    const result = await pool.query(
+      `SELECT id, email
+       FROM users
+       WHERE email = $1 AND is_active = true
+       LIMIT 1`,
+      [email],
+    );
+
+    // Generic response prevents registered-email guessing.
+    if (result.rows.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: FORGOT_PASSWORD_MESSAGE,
+      });
+    }
+
+    const user = result.rows[0];
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = hashResetToken(token);
+    const cacheKey = `password-reset:token:${tokenHash}`;
+    const resetUrl = buildResetUrl(token);
+
+    if (!resetUrl) {
+      console.error(
+        "ForgotPassword error: RESET_PASSWORD_URL or CLIENT_URL is required",
+      );
+      return res.status(500).json({
+        success: false,
+        message: "Could not send password reset email",
+      });
+    }
+
+    const stored = await setJsonCache(
+      cacheKey,
+      { user_id: user.id, email: user.email },
+      PASSWORD_RESET_TTL_SECONDS,
+    );
+
+    if (!stored) {
+      return res.status(500).json({
+        success: false,
+        message: "Could not create password reset token",
+      });
+    }
+
+    try {
+      await sendPasswordResetEmail({
+        email: user.email,
+        expiresInMinutes: Math.floor(PASSWORD_RESET_TTL_SECONDS / 60),
+        resetUrl,
+      });
+    } catch (emailErr) {
+      await deleteCacheKeys([cacheKey]);
+      console.error("ForgotPassword email error:", emailErr.message);
+      return res.status(500).json({
+        success: false,
+        message: "Could not send password reset email",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: FORGOT_PASSWORD_MESSAGE,
+    });
+  } catch (err) {
+    console.error("ForgotPassword error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not process password reset request",
+    });
+  }
+}
+/**
  * Sign out any role: destroy session cache and clear cookie.
  */
 async function SignOut(req, res) {
@@ -289,4 +391,5 @@ async function SignOut(req, res) {
   }
 }
 
-export { SignUp, SignIn, SignOut };
+export { ForgotPassword, SignUp, SignIn, SignOut };
+

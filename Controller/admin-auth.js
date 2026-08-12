@@ -1,6 +1,7 @@
 import argon2 from "argon2";
 import pool from "../Database/db.js";
-
+import { clearStudentLecturesCache } from "../Services/studentLectureCache.js";
+import { clearVenueCache } from "../Services/venueCache.js";
 /**
  * Create a new Admin
  * Only existing Admin can call this
@@ -53,7 +54,6 @@ async function createLecturer(req, res) {
   try {
     const password_hash = await argon2.hash(password);
 
-    // Check if department exists
     const deptCheck = await pool.query(
       `SELECT id FROM departments WHERE id = $1 AND is_active = true LIMIT 1`,
       [department_id],
@@ -146,7 +146,6 @@ async function createDepartment(req, res) {
   const { name, faculty_id } = req.body;
 
   try {
-    // Check faculty exists
     const facultyCheck = await pool.query(
       `SELECT id FROM faculties WHERE id = $1 AND is_active = true LIMIT 1`,
       [faculty_id],
@@ -207,7 +206,6 @@ async function createCourse(req, res) {
   } = req.body;
 
   try {
-    // Check department exists
     const deptCheck = await pool.query(
       `SELECT id FROM departments WHERE id = $1 AND is_active = true LIMIT 1`,
       [department_id],
@@ -220,7 +218,6 @@ async function createCourse(req, res) {
       });
     }
 
-    // Check for duplicate course code in the same academic year + semester
     const existing = await pool.query(
       `SELECT id FROM courses 
        WHERE course_code = $1 AND academic_year = $2 AND semester = $3
@@ -265,7 +262,6 @@ async function createVenue(req, res) {
   const { name, location, capacity } = req.body;
 
   try {
-    // Check if venue name already exists
     const existing = await pool.query(
       `SELECT id FROM venues WHERE LOWER(name) = LOWER($1) LIMIT 1`,
       [name],
@@ -298,6 +294,413 @@ async function createVenue(req, res) {
     });
   }
 }
+
+async function listAdmins(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, is_active, created_at
+       FROM users
+       WHERE role = 'admin'
+       ORDER BY created_at DESC`,
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, admins: result.rows });
+  } catch (err) {
+    console.error("listAdmins error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch admins" });
+  }
+}
+
+async function listLecturers(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.department_id,
+              d.name AS department_name, u.is_active, u.created_at,
+              COUNT(l.id)::int AS lecture_count
+       FROM users u
+       LEFT JOIN departments d ON d.id = u.department_id
+       LEFT JOIN lectures l ON l.lecturer_id = u.id
+       WHERE u.role = 'moderator'
+       GROUP BY u.id, d.name
+       ORDER BY u.created_at DESC`,
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, lecturers: result.rows });
+  } catch (err) {
+    console.error("listLecturers error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch lecturers" });
+  }
+}
+
+async function listFaculties(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, is_active, created_at, updated_at
+       FROM faculties
+       ORDER BY name ASC`,
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, faculties: result.rows });
+  } catch (err) {
+    console.error("listFaculties error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch faculties" });
+  }
+}
+
+async function listDepartments(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT d.id, d.name, d.faculty_id, f.name AS faculty_name,
+              d.is_active, d.created_at, d.updated_at
+       FROM departments d
+       JOIN faculties f ON f.id = d.faculty_id
+       ORDER BY d.name ASC`,
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, departments: result.rows });
+  } catch (err) {
+    console.error("listDepartments error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch departments" });
+  }
+}
+
+
+async function createDepartmentMatricCode(req, res) {
+  const { department_id, code } = req.body;
+
+  try {
+    const deptCheck = await pool.query(
+      `SELECT id FROM departments WHERE id = $1 AND is_active = true LIMIT 1`,
+      [department_id],
+    );
+
+    if (deptCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or inactive department",
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO department_matric_codes (department_id, code, is_active)
+       VALUES ($1, $2, true)
+       RETURNING id, department_id, code, is_active, created_at`,
+      [department_id, code],
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Department matric code created successfully",
+      department_matric_code: result.rows[0],
+    });
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "Matric code already exists",
+      });
+    }
+
+    console.error("createDepartmentMatricCode error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not create department matric code",
+    });
+  }
+}
+
+async function listDepartmentMatricCodes(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT dmc.id, dmc.department_id, d.name AS department_name,
+              dmc.code, dmc.is_active, dmc.created_at, dmc.updated_at
+       FROM department_matric_codes dmc
+       JOIN departments d ON d.id = dmc.department_id
+       ORDER BY dmc.code ASC`,
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      department_matric_codes: result.rows,
+    });
+  } catch (err) {
+    console.error("listDepartmentMatricCodes error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not fetch department matric codes",
+    });
+  }
+}
+
+async function listCourses(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT c.id, c.course_code, c.title, c.department_id,
+              d.name AS department_name, c.level, c.semester, c.type,
+              c.academic_year, c.is_active, c.created_at, c.updated_at
+       FROM courses c
+       JOIN departments d ON d.id = c.department_id
+       ORDER BY c.level ASC, c.course_code ASC`,
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, courses: result.rows });
+  } catch (err) {
+    console.error("listCourses error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch courses" });
+  }
+}
+
+async function listVenues(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, location, capacity, is_active, created_at, updated_at
+       FROM venues
+       ORDER BY name ASC`,
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, venues: result.rows });
+  } catch (err) {
+    console.error("listVenues error:", err);
+    return res.status(500).json({ success: false, message: "Could not fetch venues" });
+  }
+}
+
+
+async function deleteFaculty(req, res) {
+  const facultyId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE faculties
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, name, is_active`,
+      [facultyId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Faculty not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Faculty deactivated successfully", faculty: result.rows[0] });
+  } catch (err) {
+    console.error("deleteFaculty error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate faculty" });
+  }
+}
+
+async function deleteDepartment(req, res) {
+  const departmentId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE departments
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, name, faculty_id, is_active`,
+      [departmentId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Department not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Department deactivated successfully", department: result.rows[0] });
+  } catch (err) {
+    console.error("deleteDepartment error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate department" });
+  }
+}
+
+async function deleteDepartmentMatricCode(req, res) {
+  const codeId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE department_matric_codes
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, department_id, code, is_active`,
+      [codeId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Matric code not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Matric code deactivated successfully", department_matric_code: result.rows[0] });
+  } catch (err) {
+    console.error("deleteDepartmentMatricCode error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate matric code" });
+  }
+}
+
+async function deleteCourse(req, res) {
+  const courseId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE courses
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, course_code, title, department_id, level, semester, is_active`,
+      [courseId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Course not found or already inactive" });
+    }
+
+    await clearStudentLecturesCache({
+      department_id: result.rows[0].department_id,
+      level: result.rows[0].level,
+      semester: result.rows[0].semester,
+    });
+
+    return res.status(200).json({ success: true, message: "Course deactivated successfully", course: result.rows[0] });
+  } catch (err) {
+    console.error("deleteCourse error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate course" });
+  }
+}
+
+async function deleteVenue(req, res) {
+  const venueId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE venues
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, name, location, capacity, is_active`,
+      [venueId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Venue not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Venue deactivated successfully", venue: result.rows[0] });
+  } catch (err) {
+    console.error("deleteVenue error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate venue" });
+  }
+}async function deleteUser(req, res) {
+  const userId = Number(req.params.id);
+
+  try {
+    if (userId === req.session.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot deactivate your own account",
+      });
+    }
+
+    // Soft delete keeps old lecture history and avoids foreign-key failures.
+    const result = await pool.query(
+      `UPDATE users
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND role IN ('student', 'moderator') AND is_active = true
+       RETURNING id, name, email, role, department_id, matric_no, is_active`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found or already inactive",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User deactivated successfully",
+      user: result.rows[0],
+    });
+  } catch (err) {
+    console.error("deleteUser error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate user" });
+  }
+}
+
+async function deleteLecturer(req, res) {
+  const lecturerId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND role = 'moderator' AND is_active = true
+       RETURNING id, name, email, role, department_id, is_active`,
+      [lecturerId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Lecturer not found or already inactive",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecturer deactivated successfully",
+      lecturer: result.rows[0],
+    });
+  } catch (err) {
+    console.error("deleteLecturer error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate lecturer" });
+  }
+}
+
+async function deleteLecture(req, res) {
+  const lectureId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE lectures
+       SET status = 'cancelled', updated_at = NOW()
+       FROM courses c
+       WHERE lectures.course_id = c.id
+         AND lectures.id = $1
+         AND lectures.status IN ('scheduled', 'postponed')
+       RETURNING lectures.id, lectures.course_id, lectures.lecturer_id,
+                 lectures.venue_id, lectures.department_id,
+                 TO_CHAR(lectures.date, 'YYYY-MM-DD') AS date,
+                 lectures.start_time, lectures.end_time, lectures.status,
+                 lectures.notes, lectures.updated_at, c.level, c.semester`,
+      [lectureId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Lecture not found or already inactive",
+      });
+    }
+
+    await clearStudentLecturesCache({
+      department_id: result.rows[0].department_id,
+      level: result.rows[0].level,
+      semester: result.rows[0].semester,
+      dates: [result.rows[0].date],
+    });
+    await clearVenueCache({
+      venue_ids: [result.rows[0].venue_id],
+      dates: [result.rows[0].date],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecture cancelled successfully",
+      lecture: result.rows[0],
+    });
+  } catch (err) {
+    console.error("deleteLecture error:", err);
+    return res.status(500).json({ success: false, message: "Could not cancel lecture" });
+  }
+}
 export {
   createAdmin,
   createLecturer,
@@ -305,4 +708,30 @@ export {
   createDepartment,
   createCourse,
   createVenue,
+  listAdmins,
+  listLecturers,
+  listFaculties,
+  listDepartments,
+  createDepartmentMatricCode,
+  listDepartmentMatricCodes,
+  listCourses,
+  listVenues,
+  deleteUser,
+  deleteFaculty,
+  deleteDepartment,
+  deleteDepartmentMatricCode,
+  deleteCourse,
+  deleteVenue,
+  deleteLecturer,
+  deleteLecture,
 };
+
+
+
+
+
+
+
+
+
+

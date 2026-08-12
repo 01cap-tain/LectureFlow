@@ -8,16 +8,19 @@ import pool from "./Database/db.js";
 import adminRoutes from "./Routes/admin.routes.js";
 import profileRoutes from "./Routes/profile.routes.js";
 import lectureRoutes from "./Routes/lecture.routes.js";
+import studentRoutes from "./Routes/student.routes.js";
+import { RedisStore } from "connect-redis";
+import { getValkeyClient } from "./Services/valkey.js";
 
 const app = express();
 const PORT = process.env.PORT || 8181;
+const sessionClient = await getValkeyClient();
 
 app.use(
   cors({
     origin: process.env.CLIENT_URL || true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
@@ -25,20 +28,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(
-  session({
-    name: "lectureflow.sid",
-    secret: process.env.SESSION_SECRET || "dev-only-change-me",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
-    },
-  }),
-);
+const sessionConfig = {
+  name: "lectureflow.sid",
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+  },
+};
+
+if (sessionClient?.isReady) {
+  sessionConfig.store = new RedisStore({ client: sessionClient });
+} else {
+  // Local fallback only: server can boot when Valkey is unavailable.
+  console.warn("Valkey session store unavailable. Using in-memory sessions.");
+}
+
+const sessionMiddleware = session(sessionConfig);
+
+app.use((req, res, next) => {
+  sessionMiddleware(req, res, (err) => {
+    if (!err) return next();
+
+    console.error("Session store error:", err.message);
+    return res.status(503).json({
+      success: false,
+      message: "Session service temporarily unavailable",
+    });
+  });
+});
 
 // Lightweight health check (must not touch the database)
 app.get("/health", (req, res) => {
@@ -48,6 +70,7 @@ app.get("/health", (req, res) => {
 app.use("/auth", authRoute);
 app.use("/admin", adminRoutes);
 app.use("/profile", profileRoutes);
+app.use("/student", studentRoutes);
 
 app.use("/lectures", lectureRoutes);
 

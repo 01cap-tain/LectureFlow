@@ -4,15 +4,33 @@ import { requireAuth, requireRole } from "../Middleware/user-middleware.js";
 import {
   createAdmin,
   createDepartment,
+  createDepartmentMatricCode,
   createFaculty,
   createLecturer,
   createCourse,
   createVenue,
+  deleteUser,
+  deleteLecturer,
+  deleteLecture,
+  deleteFaculty,
+  deleteDepartment,
+  deleteDepartmentMatricCode,
+  deleteCourse,
+  deleteVenue,
+  listAdmins,
+  listCourses,
+  listDepartments,
+  listDepartmentMatricCodes,
+  listFaculties,
+  listLecturers,
+  listVenues,
 } from "../Controller/admin-auth.js";
 
 import {
+  validateAdminIdParam,
   validateCreateAdmin,
   validateCreateDepartment,
+  validateCreateDepartmentMatricCode,
   validateCreateFaculty,
   validateCreateLecturer,
   validateCreateCourse,
@@ -20,6 +38,87 @@ import {
 } from "../Middleware/admin-middleware.js";
 
 const router = express.Router();
+
+// Admin list endpoints for dashboard tables and form dropdowns.
+router.get("/admins", requireAuth, requireRole("admin"), listAdmins);
+router.get("/lecturers", requireAuth, requireRole("admin"), listLecturers);
+router.get("/faculties", requireAuth, requireRole("admin"), listFaculties);
+router.get("/departments", requireAuth, requireRole("admin"), listDepartments);
+router.get(
+  "/department-matric-codes",
+  requireAuth,
+  requireRole("admin"),
+  listDepartmentMatricCodes,
+);
+router.get("/courses", requireAuth, requireRole("admin"), listCourses);
+router.get("/venues", requireAuth, requireRole("admin"), listVenues);
+
+
+router.delete(
+  "/faculties/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteFaculty,
+);
+
+router.delete(
+  "/departments/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteDepartment,
+);
+
+router.delete(
+  "/department-matric-codes/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteDepartmentMatricCode,
+);
+
+router.delete(
+  "/courses/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteCourse,
+);
+
+router.delete(
+  "/venues/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteVenue,
+);
+
+// Remove active users from the system without breaking lecture history.
+router.delete(
+  "/users/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteUser,
+);
+
+router.delete(
+  "/lecturers/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteLecturer,
+);
+
+// Schedules are cancelled, not hard-deleted, to preserve audit/history.
+router.delete(
+  "/lectures/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteLecture,
+);
 
 // Create Admin
 router.post(
@@ -57,6 +156,15 @@ router.post(
   createDepartment,
 );
 
+// Create Department Matric Code
+router.post(
+  "/department-matric-codes",
+  requireAuth,
+  requireRole("admin"),
+  validateCreateDepartmentMatricCode,
+  createDepartmentMatricCode,
+);
+
 // Create Course
 router.post(
   "/courses",
@@ -76,3 +184,4 @@ router.post(
 );
 
 export default router;
+

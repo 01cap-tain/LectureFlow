@@ -8,10 +8,13 @@ export async function getMyProfile(req, res) {
     const userId = req.session.user.id;
 
     const result = await pool.query(
-      `SELECT id, name, email, role, department_id, matric_no,
-              level, current_semester, phone, is_active, created_at
+      `SELECT users.id, users.name, users.email, users.role,
+              users.department_id, departments.name AS department_name,
+              users.matric_no, users.level, users.current_semester,
+              users.phone, users.is_active, users.created_at
        FROM users
-       WHERE id = $1`,
+       LEFT JOIN departments ON departments.id = users.department_id
+       WHERE users.id = $1`,
       [userId],
     );
 
@@ -86,7 +89,7 @@ export async function completeProfile(req, res) {
  */
 export async function updateProfile(req, res) {
   const userId = req.session.user.id;
-  const { name, level, current_semester, phone } = req.body;
+  const { name, email, level, current_semester, phone } = req.body;
 
   try {
     const fields = [];
@@ -96,6 +99,10 @@ export async function updateProfile(req, res) {
     if (name !== undefined) {
       fields.push(`name = $${index++}`);
       values.push(name);
+    }
+    if (email !== undefined) {
+      fields.push(`email = $${index++}`);
+      values.push(email);
     }
     if (level !== undefined) {
       fields.push(`level = $${index++}`);
@@ -139,6 +146,7 @@ export async function updateProfile(req, res) {
     // Update session
     const updated = result.rows[0];
     req.session.user.name = updated.name;
+    req.session.user.email = updated.email;
     req.session.user.level = updated.level;
     req.session.user.current_semester = updated.current_semester;
 
@@ -148,6 +156,13 @@ export async function updateProfile(req, res) {
       profile: updated,
     });
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "Email is already in use",
+      });
+    }
+
     console.error("updateProfile error:", err);
     return res.status(500).json({
       success: false,

@@ -281,3 +281,60 @@ export function validateCreateVenue(req, res, next) {
       .json({ success: false, message: "Validation failed" });
   }
 }
+
+/**
+ * Validate Create Department Matric Code
+ */
+export function validateCreateDepartmentMatricCode(req, res, next) {
+  try {
+    const department_id = req.body?.department_id;
+    const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+    const errors = [];
+
+    if (!department_id || isNaN(Number(department_id))) {
+      errors.push("Valid department_id is required");
+    }
+
+    if (!code || !validator.isAlphanumeric(code) || code.length > 20) {
+      errors.push("Code must be letters/numbers only and at most 20 characters");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    req.body.department_id = Number(department_id);
+    req.body.code = code.toUpperCase();
+    next();
+  } catch (err) {
+    console.error("validateCreateDepartmentMatricCode error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}
+/**
+ * Validate numeric id params used by admin delete routes.
+ */
+export function validateAdminIdParam(req, res, next) {
+  try {
+    const id = Number(req.params?.id);
+
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["id must be a positive number"],
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("validateAdminIdParam error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}
+
+
+
