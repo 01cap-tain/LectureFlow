@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../api/client";
 import { PasswordInput } from "../components/PasswordInput";
 import logo from "../assets/LogoMakr-8frzfc.png";
@@ -33,11 +33,7 @@ export default function SignIn() {
       const role = data.user?.role;
       if (role === "admin") navigate("/admin/dashboard", { replace: true });
       else if (role === "moderator") navigate("/moderator/today", { replace: true });
-      else if (!data.user?.name || !data.user?.level || !data.user?.current_semester) {
-        navigate("/student/setup", { replace: true });
-      } else {
-        navigate("/student/dashboard", { replace: true });
-      }
+      else navigate("/student/dashboard", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -79,9 +75,6 @@ export default function SignIn() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="auth-switch">
-          New student? <NavLink to="/auth/signup">Create account</NavLink>
-        </p>
       </section>
     </main>
   );
