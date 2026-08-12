@@ -999,3 +999,20 @@ h1,
 }
 
 
+
+.auth-switch {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.auth-switch a {
+  color: var(--soft);
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.auth-switch a:hover,
+.auth-switch a:focus-visible {
+  color: var(--accent-2);
+}

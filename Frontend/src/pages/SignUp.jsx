@@ -4,9 +4,9 @@ import { apiRequest } from "../api/client";
 import { PasswordInput } from "../components/PasswordInput";
 import logo from "../assets/LogoMakr-8frzfc.png";
 
-export default function SignIn() {
+export default function SignUp() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ identifier: "", password: "" });
+  const [form, setForm] = useState({ email: "", matric_no: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,24 +20,8 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      const identifier = form.identifier.trim();
-      const loginPayload = identifier.includes("@")
-        ? { email: identifier, password: form.password }
-        : { matric_no: identifier, password: form.password };
-
-      const data = await apiRequest("/auth/signin", {
-        method: "POST",
-        body: loginPayload,
-      });
-
-      const role = data.user?.role;
-      if (role === "admin") navigate("/admin/dashboard", { replace: true });
-      else if (role === "moderator") navigate("/moderator/today", { replace: true });
-      else if (!data.user?.name || !data.user?.level || !data.user?.current_semester) {
-        navigate("/student/setup", { replace: true });
-      } else {
-        navigate("/student/dashboard", { replace: true });
-      }
+      await apiRequest("/auth/signup", { method: "POST", body: form });
+      navigate("/auth/signin", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -53,22 +37,18 @@ export default function SignIn() {
           <span>LectureFlow</span>
         </div>
         <div>
-          <h1>Sign in</h1>
-          <p className="muted">Access your campus schedule workspace.</p>
+          <h1>Sign up</h1>
+          <p className="muted">Create your student schedule account.</p>
         </div>
 
         <form className="form-stack" onSubmit={handleSubmit}>
           <label>
-            <span>Email or matric number</span>
-            <input
-              name="identifier"
-              type="text"
-              value={form.identifier}
-              onChange={updateField}
-              autoCapitalize="characters"
-              autoComplete="username"
-              required
-            />
+            <span>Email</span>
+            <input name="email" type="email" value={form.email} onChange={updateField} autoComplete="email" required />
+          </label>
+          <label>
+            <span>Matric number</span>
+            <input name="matric_no" type="text" value={form.matric_no} onChange={updateField} autoCapitalize="characters" autoComplete="username" required />
           </label>
           <label>
             <span>Password</span>
@@ -76,11 +56,12 @@ export default function SignIn() {
           </label>
           {error ? <p className="form-error">{error}</p> : null}
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Creating..." : "Create account"}
           </button>
         </form>
+
         <p className="auth-switch">
-          New student? <NavLink to="/auth/signup">Create account</NavLink>
+          Already have an account? <NavLink to="/auth/signin">Sign in</NavLink>
         </p>
       </section>
     </main>
