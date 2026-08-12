@@ -315,10 +315,13 @@ async function listLecturers(req, res) {
   try {
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.role, u.department_id,
-              d.name AS department_name, u.is_active, u.created_at
+              d.name AS department_name, u.is_active, u.created_at,
+              COUNT(l.id)::int AS lecture_count
        FROM users u
        LEFT JOIN departments d ON d.id = u.department_id
+       LEFT JOIN lectures l ON l.lecturer_id = u.id
        WHERE u.role = 'moderator'
+       GROUP BY u.id, d.name
        ORDER BY u.created_at DESC`,
     );
 
@@ -463,7 +466,127 @@ async function listVenues(req, res) {
   }
 }
 
-async function deleteUser(req, res) {
+
+async function deleteFaculty(req, res) {
+  const facultyId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE faculties
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, name, is_active`,
+      [facultyId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Faculty not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Faculty deactivated successfully", faculty: result.rows[0] });
+  } catch (err) {
+    console.error("deleteFaculty error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate faculty" });
+  }
+}
+
+async function deleteDepartment(req, res) {
+  const departmentId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE departments
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, name, faculty_id, is_active`,
+      [departmentId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Department not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Department deactivated successfully", department: result.rows[0] });
+  } catch (err) {
+    console.error("deleteDepartment error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate department" });
+  }
+}
+
+async function deleteDepartmentMatricCode(req, res) {
+  const codeId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE department_matric_codes
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, department_id, code, is_active`,
+      [codeId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Matric code not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Matric code deactivated successfully", department_matric_code: result.rows[0] });
+  } catch (err) {
+    console.error("deleteDepartmentMatricCode error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate matric code" });
+  }
+}
+
+async function deleteCourse(req, res) {
+  const courseId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE courses
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, course_code, title, department_id, level, semester, is_active`,
+      [courseId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Course not found or already inactive" });
+    }
+
+    await clearStudentLecturesCache({
+      department_id: result.rows[0].department_id,
+      level: result.rows[0].level,
+      semester: result.rows[0].semester,
+    });
+
+    return res.status(200).json({ success: true, message: "Course deactivated successfully", course: result.rows[0] });
+  } catch (err) {
+    console.error("deleteCourse error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate course" });
+  }
+}
+
+async function deleteVenue(req, res) {
+  const venueId = Number(req.params.id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE venues
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING id, name, location, capacity, is_active`,
+      [venueId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Venue not found or already inactive" });
+    }
+
+    return res.status(200).json({ success: true, message: "Venue deactivated successfully", venue: result.rows[0] });
+  } catch (err) {
+    console.error("deleteVenue error:", err);
+    return res.status(500).json({ success: false, message: "Could not deactivate venue" });
+  }
+}async function deleteUser(req, res) {
   const userId = Number(req.params.id);
 
   try {
@@ -594,9 +717,15 @@ export {
   listCourses,
   listVenues,
   deleteUser,
+  deleteFaculty,
+  deleteDepartment,
+  deleteDepartmentMatricCode,
+  deleteCourse,
+  deleteVenue,
   deleteLecturer,
   deleteLecture,
 };
+
 
 
 

@@ -21,6 +21,14 @@ function getCampusDateTime() {
   };
 }
 
+function isPastLectureStart(date, start_time) {
+  const now = getCampusDateTime();
+  const lectureDate = typeof date === "string" ? date : date.toISOString().slice(0, 10);
+  const lectureStart = String(start_time).slice(0, 5);
+
+  return lectureDate < now.date || (lectureDate === now.date && lectureStart <= now.time.slice(0, 5));
+}
+
 /**
  * Schedule a new lecture (Moderator only)
  */
@@ -212,6 +220,75 @@ export async function getVenues(req, res) {
 }
 
 /**
+ * Get current and upcoming lectures for one venue.
+ * Used only after a moderator selects a venue on the schedule form.
+ */
+export async function getVenueQueueForModerator(req, res) {
+  try {
+    const venue_id = Number(req.params.venue_id);
+    const now = getCampusDateTime();
+
+    if (!venue_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid venue_id is required",
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT
+         l.id,
+         TO_CHAR(l.date, 'YYYY-MM-DD') AS date,
+         l.start_time,
+         l.end_time,
+         l.status,
+         CASE
+           WHEN l.date = $2::date
+                AND l.start_time <= $3::time
+                AND l.end_time > $3::time
+           THEN 'ongoing'
+           ELSE l.status::text
+         END AS live_status,
+         c.course_code,
+         c.title AS course_title,
+         d.name AS department_name,
+         u.name AS lecturer_name
+       FROM lectures l
+       JOIN courses c ON c.id = l.course_id
+       JOIN departments d ON d.id = l.department_id
+       JOIN users u ON u.id = l.lecturer_id
+       WHERE l.venue_id = $1
+         AND l.status IN ('scheduled', 'postponed')
+         AND (
+           l.date > $2::date
+           OR (l.date = $2::date AND l.end_time > $3::time)
+         )
+       ORDER BY l.date ASC, l.start_time ASC
+       LIMIT 15`,
+      [venue_id, now.date, now.time],
+    );
+
+    const current_lecture =
+      result.rows.find((lecture) => lecture.live_status === "ongoing") || null;
+
+    return res.status(200).json({
+      success: true,
+      checked_at_date: now.date,
+      checked_at_time: now.time,
+      current_lecture,
+      count: result.rows.length,
+      lectures: result.rows,
+    });
+  } catch (err) {
+    console.error("getVenueQueueForModerator error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not fetch venue schedule",
+    });
+  }
+}
+
+/**
  * Postpone a lecture
  * Only the lecturer who created it can postpone it
  */
@@ -252,6 +329,15 @@ export async function postponeLecture(req, res) {
     const newStart = start_time || current.start_time;
     const newEnd = end_time || current.end_time;
     const newVenue = venue_id || current.venue_id;
+
+    // Recheck after merging old and new values, so partial postpone requests stay safe.
+    if (isPastLectureStart(newDate, newStart)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Lecture start_time cannot already be in the past",
+      });
+    }
 
     // 2. Conflict detection (only if time or venue changed)
     if (date || start_time || end_time || venue_id) {
@@ -393,6 +479,8 @@ export async function getMyLectures(req, res) {
     let query = `
       SELECT
          l.id,
+         l.course_id,
+         l.venue_id,
          TO_CHAR(l.date, 'YYYY-MM-DD') AS date,
          l.start_time,
          l.end_time,

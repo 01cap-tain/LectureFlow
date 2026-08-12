@@ -55,6 +55,7 @@ export function validateGetStudentLectures(req, res, next) {
 export function validateVenueIdParam(req, res, next) {
   try {
     const venue_id = Number(req.params?.venue_id);
+    const date = typeof req.query?.date === "string" ? req.query.date.trim() : "";
 
     if (!Number.isInteger(venue_id) || venue_id < 1) {
       return res.status(400).json({
@@ -63,7 +64,18 @@ export function validateVenueIdParam(req, res, next) {
       });
     }
 
+    if (
+      date &&
+      !validator.isDate(date, { format: "YYYY-MM-DD", strictMode: true })
+    ) {
+      return res.status(400).json({
+        success: false,
+        errors: ["date must be in YYYY-MM-DD format"],
+      });
+    }
+
     req.venue_id = venue_id;
+    req.venue_queue_date = date || getTodayDate();
     next();
   } catch (err) {
     console.error("validateVenueIdParam error:", err);

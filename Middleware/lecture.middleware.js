@@ -12,6 +12,10 @@ function getTodayDate() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function isPastDate(date) {
+  return date < getTodayDate();
+}
+
 function parseLectureTime(value) {
   if (typeof value !== "string") return null;
 
@@ -36,7 +40,7 @@ function parseLectureTime(value) {
   return `${String(hour).padStart(2, "0")}:${minute}`;
 }
 
-function isSameDayPastTime(date, end_time) {
+function isSameDayPastTime(date, start_time) {
   if (date !== getTodayDate()) return false;
 
   const nowParts = new Intl.DateTimeFormat("en-GB", {
@@ -49,7 +53,7 @@ function isSameDayPastTime(date, end_time) {
   const values = Object.fromEntries(nowParts.map((part) => [part.type, part.value]));
   const currentTime = `${values.hour}:${values.minute}`;
 
-  return end_time <= currentTime;
+  return start_time <= currentTime;
 }
 
 /**
@@ -95,8 +99,13 @@ export function validateScheduleLecture(req, res, next) {
       errors.push("end_time must be after start_time");
     }
 
-    if (date && end_time && isSameDayPastTime(date, end_time)) {
-      errors.push("Lecture end_time cannot already be in the past for today");
+    if (date && isPastDate(date)) {
+      errors.push("Lecture date cannot be in the past");
+    }
+
+    // A lecture that has already started should not be newly scheduled.
+    if (date && start_time && isSameDayPastTime(date, start_time)) {
+      errors.push("Lecture start_time cannot already be in the past for today");
     }
 
     if (errors.length > 0) {
@@ -159,6 +168,15 @@ export function validatePostponeLecture(req, res, next) {
 
     if (start_time && end_time && start_time >= end_time) {
       errors.push("end_time must be after start_time");
+    }
+
+    if (date && isPastDate(date)) {
+      errors.push("Lecture date cannot be in the past");
+    }
+
+    // This catches postpone requests where the new date and start time are both provided.
+    if (date && start_time && isSameDayPastTime(date, start_time)) {
+      errors.push("Lecture start_time cannot already be in the past for today");
     }
 
     if (venue_id && isNaN(Number(venue_id))) {

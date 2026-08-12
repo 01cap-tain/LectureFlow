@@ -9,6 +9,7 @@ import {
   scheduleLecture,
   getMyCourses,
   getVenues,
+  getVenueQueueForModerator,
   postponeLecture,
   cancelLecture,
   getMyLectures,
@@ -21,6 +22,14 @@ router.get("/courses/my", requireAuth, requireRole("moderator"), getMyCourses);
 
 // Get venues
 router.get("/venues", requireAuth, requireRole("moderator"), getVenues);
+
+// Get current/upcoming schedules for one venue
+router.get(
+  "/venues/:venue_id/queue",
+  requireAuth,
+  requireRole("moderator"),
+  getVenueQueueForModerator,
+);
 
 // Schedule lecture
 router.post(

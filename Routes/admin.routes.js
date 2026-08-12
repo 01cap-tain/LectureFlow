@@ -12,6 +12,11 @@ import {
   deleteUser,
   deleteLecturer,
   deleteLecture,
+  deleteFaculty,
+  deleteDepartment,
+  deleteDepartmentMatricCode,
+  deleteCourse,
+  deleteVenue,
   listAdmins,
   listCourses,
   listDepartments,
@@ -47,6 +52,47 @@ router.get(
 );
 router.get("/courses", requireAuth, requireRole("admin"), listCourses);
 router.get("/venues", requireAuth, requireRole("admin"), listVenues);
+
+
+router.delete(
+  "/faculties/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteFaculty,
+);
+
+router.delete(
+  "/departments/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteDepartment,
+);
+
+router.delete(
+  "/department-matric-codes/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteDepartmentMatricCode,
+);
+
+router.delete(
+  "/courses/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteCourse,
+);
+
+router.delete(
+  "/venues/:id",
+  requireAuth,
+  requireRole("admin"),
+  validateAdminIdParam,
+  deleteVenue,
+);
 
 // Remove active users from the system without breaking lecture history.
 router.delete(
@@ -112,7 +158,7 @@ router.post(
 
 // Create Department Matric Code
 router.post(
-  "/depart-matric-codes",
+  "/department-matric-codes",
   requireAuth,
   requireRole("admin"),
   validateCreateDepartmentMatricCode,
@@ -138,3 +184,4 @@ router.post(
 );
 
 export default router;
+

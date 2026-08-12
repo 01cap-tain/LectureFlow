@@ -95,7 +95,7 @@ export async function getStudentLectures(req, res) {
       WHERE l.department_id = $1
         AND c.level = $2
         AND c.semester = $3
-        AND l.status IN ('scheduled', 'postponed')
+        AND l.status IN ('scheduled', 'postponed', 'cancelled')
     `;
 
     if (mode === "date") {
@@ -105,7 +105,7 @@ export async function getStudentLectures(req, res) {
       query += `
         AND (
           l.date > $4::date
-          OR (l.date = $4::date AND l.end_time > $5::time)
+          OR (l.date = $4::date AND (l.end_time > $5::time OR l.status = 'cancelled'))
         )
       `;
     }
@@ -148,7 +148,8 @@ export async function getVenueQueue(req, res) {
   try {
     const now = getCampusDateTime();
     const venue_id = req.venue_id;
-    const cacheKey = getVenueQueueCacheKey({ venue_id, date: now.date });
+    const selectedDate = req.venue_queue_date || now.date;
+    const cacheKey = getVenueQueueCacheKey({ venue_id, date: selectedDate });
 
     const cached = await getJsonCache(cacheKey);
     if (cached) {
@@ -207,6 +208,8 @@ export async function getVenueQueue(req, res) {
          l.end_time,
          l.status,
          CASE
+           WHEN l.status = 'cancelled'
+           THEN 'cancelled'
            WHEN l.date = $2::date
                 AND l.start_time <= $3::time
                 AND l.end_time > $3::time
@@ -224,14 +227,11 @@ export async function getVenueQueue(req, res) {
        JOIN departments d ON d.id = l.department_id
        JOIN users u ON u.id = l.lecturer_id
        WHERE l.venue_id = $1
-         AND l.status IN ('scheduled', 'postponed')
-         AND (
-           l.date > $2::date
-           OR (l.date = $2::date AND l.end_time > $3::time)
-         )
+         AND l.status IN ('scheduled', 'postponed', 'cancelled')
+         AND l.date = $2::date
        ORDER BY l.date ASC, l.start_time ASC
        LIMIT 15`,
-      [venue_id, now.date, now.time],
+      [venue_id, selectedDate, now.time],
     );
 
     const currentLecture = currentResult.rows[0] || null;
@@ -240,6 +240,7 @@ export async function getVenueQueue(req, res) {
     const payload = {
       checked_at_date: now.date,
       checked_at_time: now.time,
+      queue_date: selectedDate,
       venue: venueResult.rows[0],
       venue_status: venueStatus,
       remaining_minutes: currentLecture
