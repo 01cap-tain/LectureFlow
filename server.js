@@ -40,7 +40,7 @@ const sessionConfig = {
   cookie: {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
+    sameSite: "none",
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
   },
 };
