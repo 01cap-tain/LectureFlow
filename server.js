@@ -15,6 +15,7 @@ import { getValkeyClient } from "./Services/valkey.js";
 const app = express();
 const PORT = process.env.PORT || 8181;
 const sessionClient = await getValkeyClient();
+const isProduction = process.env.NODE_ENV === "production";
 
 // Render sits in front of the app as a proxy. This lets secure cookies work in production.
 app.set("trust proxy", 1);
@@ -38,8 +39,8 @@ const sessionConfig = {
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV,
-    sameSite: process.env.NODE_ENV ? "none" : "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
   },
 };
