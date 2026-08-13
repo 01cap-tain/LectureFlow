@@ -1,5 +1,7 @@
-import http from "k6/http";
+﻿import http from "k6/http";
 import { check, group, sleep } from "k6";
+import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";
+import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:8181";
 const STUDENT_MATRIC_NO = __ENV.STUDENT_MATRIC_NO;
@@ -7,14 +9,15 @@ const STUDENT_PASSWORD = __ENV.STUDENT_PASSWORD;
 const MODERATOR_EMAIL = __ENV.MODERATOR_EMAIL;
 const MODERATOR_PASSWORD = __ENV.MODERATOR_PASSWORD;
 const TEST_VENUE_ID = __ENV.TEST_VENUE_ID;
+const REPORT_DIR = __ENV.REPORT_DIR || ".";
 
 export const options = {
   stages: [
-    { duration: "1m", target: 10 },
-    { duration: "15s", target: 300 },
-    { duration: "1m", target: 300 },
-    { duration: "15s", target: 10 },
-    { duration: "1m", target: 0 },
+    { duration: "20s", target: 10 },
+    { duration: "10s", target: 150 },
+    { duration: "40s", target: 150 },
+    { duration: "10s", target: 10 },
+    { duration: "20s", target: 0 },
   ],
   thresholds: {
     http_req_failed: ["rate<0.20"],
@@ -137,7 +140,7 @@ export default function (data) {
 
       check(response, {
         "student lectures returned 200": (r) => r.status === 200,
-        "student lectures response is valid": (r) => r.json("success") === true,
+        "student lectures response is valid": (r) => r.status === 200 && r.json("success") === true,
       });
     });
   } else if (roll < 0.97 && data.venueId) {
@@ -151,7 +154,7 @@ export default function (data) {
 
       check(response, {
         "venue queue returned 200": (r) => r.status === 200,
-        "venue queue response is valid": (r) => r.json("success") === true,
+        "venue queue response is valid": (r) => r.status === 200 && r.json("success") === true,
       });
     });
   } else {
@@ -167,17 +170,33 @@ export default function (data) {
         "profile returned 200": (r) => r.status === 200,
       });
 
-      // Optional moderator read-only check; no schedule is created during smoke test.
+      // Optional lecturer read checks. These do not create schedules or mutate data.
       if (data.moderatorCookie) {
         const myLectures = http.get(
           `${BASE_URL}/lectures/my`,
           jsonHeaders(data.moderatorCookie),
         );
-
-        logFailure("moderator lectures", myLectures);
-
+        logFailure("lecturer lectures", myLectures);
         check(myLectures, {
-          "moderator lectures returned 200": (r) => r.status === 200,
+          "lecturer lectures returned 200": (r) => r.status === 200,
+        });
+
+        const myCourses = http.get(
+          `${BASE_URL}/lectures/courses/my`,
+          jsonHeaders(data.moderatorCookie),
+        );
+        logFailure("lecturer courses", myCourses);
+        check(myCourses, {
+          "lecturer courses returned 200": (r) => r.status === 200,
+        });
+
+        const venues = http.get(
+          `${BASE_URL}/lectures/venues`,
+          jsonHeaders(data.moderatorCookie),
+        );
+        logFailure("lecturer venues", venues);
+        check(venues, {
+          "lecturer venues returned 200": (r) => r.status === 200,
         });
       }
     });
@@ -186,4 +205,12 @@ export default function (data) {
   sleep(1);
 }
 
+
+
+export function handleSummary(data) {
+  return {
+    stdout: textSummary(data, { indent: " ", enableColors: true }),
+    [`${REPORT_DIR}/spike-report.html`]: htmlReport(data, { title: "LectureFlow Spike Test" }),
+  };
+}
 

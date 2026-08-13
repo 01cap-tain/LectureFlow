@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Building2, GraduationCap, Hash, LogOut, Mail, Shield, UserRound } from "lucide-react";
 import { apiRequest } from "../api/client";
@@ -9,6 +9,7 @@ import { moderatorTabs } from "./moderatorConfig";
 
 export default function ModeratorProfile() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState("");
@@ -21,6 +22,7 @@ export default function ModeratorProfile() {
     setSigningOut(true);
     try {
       await apiRequest("/auth/signout", { method: "POST" });
+      queryClient.removeQueries({ queryKey: ["profile"] });
       navigate("/auth/signin", { replace: true });
     } catch (err) {
       setError(err.message);

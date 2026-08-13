@@ -16,13 +16,23 @@ const app = express();
 const PORT = process.env.PORT || 8181;
 const sessionClient = await getValkeyClient();
 const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Render sits in front of the app as a proxy. This lets secure cookies work in production.
 app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || true,
+    origin(origin, callback) {
+      // Server-to-server tools may not send an Origin header.
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],

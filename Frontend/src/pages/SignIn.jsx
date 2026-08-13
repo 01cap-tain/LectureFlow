@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../api/client";
 import { PasswordInput } from "../components/PasswordInput";
 import logo from "../assets/LogoMakr-8frzfc.png";
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,6 +22,9 @@ export default function SignIn() {
     setLoading(true);
 
     try {
+      // Remove any profile cached from a previous student/moderator/admin login.
+      queryClient.removeQueries({ queryKey: ["profile"] });
+
       const identifier = form.identifier.trim();
       const loginPayload = identifier.includes("@")
         ? { email: identifier, password: form.password }
@@ -31,6 +36,13 @@ export default function SignIn() {
       });
 
       const role = data.user?.role;
+
+      // Confirm the new session before entering a protected page.
+      await queryClient.fetchQuery({
+        queryKey: ["profile"],
+        queryFn: () => apiRequest("/profile/me"),
+      });
+
       if (role === "admin") navigate("/admin/dashboard", { replace: true });
       else if (role === "moderator") navigate("/moderator/today", { replace: true });
       else navigate("/student/dashboard", { replace: true });
@@ -61,8 +73,10 @@ export default function SignIn() {
               type="text"
               value={form.identifier}
               onChange={updateField}
-              autoCapitalize="characters"
+              autoCapitalize="none"
+              autoCorrect="off"
               autoComplete="username"
+              spellCheck="false"
               required
             />
           </label>

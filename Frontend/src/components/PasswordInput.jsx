@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-export function PasswordInput({ value, onChange, name = "password", required = true }) {
+export function PasswordInput({ value, onChange, name = "password", required = true, autoComplete = "current-password" }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -11,6 +11,7 @@ export function PasswordInput({ value, onChange, name = "password", required = t
         type={visible ? "text" : "password"}
         value={value}
         onChange={onChange}
+        autoComplete={autoComplete}
         required={required}
       />
       <button
