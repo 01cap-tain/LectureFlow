@@ -5,6 +5,10 @@ import { apiRequest } from "../api/client";
 import { PasswordInput } from "../components/PasswordInput";
 import logo from "../assets/LogoMakr-8frzfc.png";
 
+function studentProfileIsIncomplete(profile) {
+  return profile?.role === "student" && (!profile.name || !profile.level || !profile.current_semester);
+}
+
 export default function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,13 +43,14 @@ export default function SignIn() {
       const role = data.user?.role;
 
       // Confirm the new session before entering a protected page.
-      await queryClient.fetchQuery({
+      const profileData = await queryClient.fetchQuery({
         queryKey: ["profile"],
         queryFn: () => apiRequest("/profile/me"),
       });
 
       if (role === "admin") navigate("/admin/dashboard", { replace: true });
       else if (role === "moderator") navigate("/moderator/today", { replace: true });
+      else if (studentProfileIsIncomplete(profileData.profile)) navigate("/student/complete-profile", { replace: true });
       else navigate("/student/dashboard", { replace: true });
     } catch (err) {
       setError(err.message);

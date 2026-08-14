@@ -12,6 +12,7 @@ const ModeratorDashboard = lazy(() => import("./pages/ModeratorDashboard"));
 const ModeratorLectureDetail = lazy(() => import("./pages/ModeratorLectureDetail"));
 const ModeratorProfile = lazy(() => import("./pages/ModeratorProfile"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
+const StudentCompleteProfile = lazy(() => import("./pages/StudentCompleteProfile"));
 const StudentProfile = lazy(() => import("./pages/StudentProfile"));
 
 function PageFallback() {
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/moderator/dashboard" element={protect(<ModeratorDashboard />, ["moderator"])} />
         <Route path="/moderator/lectures/:id" element={protect(<ModeratorLectureDetail />, ["moderator"])} />
         <Route path="/moderator/profile" element={protect(<ModeratorProfile />, ["moderator"])} />
+        <Route path="/student/complete-profile" element={protect(<StudentCompleteProfile />, ["student"])} />
         <Route path="/student/dashboard" element={protect(<StudentDashboard />, ["student"])} />
         <Route path="/student/profile" element={protect(<StudentProfile />, ["student"])} />
         <Route path="*" element={<Navigate to="/auth/signin" replace />} />
