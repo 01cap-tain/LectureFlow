@@ -1,4 +1,4 @@
-﻿import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../api/client";
 
@@ -30,7 +30,18 @@ export function ProtectedRoute({ children, roles }) {
 
   const isCompleteProfilePage = location.pathname === "/student/complete-profile";
   if (studentProfileIsIncomplete(profile) && !isCompleteProfilePage) {
-    return <Navigate to="/student/complete-profile" replace state={{ from: location.pathname }} />;
+    return (
+      <main className="auth-screen">
+        <section className="profile-caution">
+          <p className="eyebrow">Profile required</p>
+          <h1>Complete your profile before viewing lectures.</h1>
+          <p className="muted">Your level and semester help LectureFlow show only the schedules meant for you.</p>
+          <Link className="primary-button profile-caution-link" to="/student/complete-profile" state={{ from: location.pathname }}>
+            Complete profile
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   if (!studentProfileIsIncomplete(profile) && isCompleteProfilePage) {

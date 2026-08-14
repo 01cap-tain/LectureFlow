@@ -877,6 +877,27 @@ h1,
 
 
 
+.profile-caution {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(168, 175, 162, 0.3);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(5, 7, 5, 0.5);
+}
+
+.profile-caution h1 {
+  font-size: 1.25rem;
+}
+
+.profile-caution-link {
+  display: inline-grid;
+  place-items: center;
+  color: #f4f8ef;
+  text-decoration: none;
+}
+
+.student-greeting-card,
 .student-summary-card,
 .student-lecture-card {
   display: grid;
@@ -885,6 +906,20 @@ h1,
   border-radius: 8px;
   color: var(--text);
   background: rgba(5, 7, 5, 0.34);
+}
+
+.student-greeting-card {
+  padding: 14px;
+  border-color: rgba(168, 175, 162, 0.22);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    rgba(5, 7, 5, 0.42);
+  background-size: 21px 21px;
+}
+
+.student-greeting-card h2 {
+  font-size: 1rem;
 }
 
 .student-summary-card {

@@ -23,6 +23,22 @@ function statusLabel(lecture) {
   return startsInLabel(lecture);
 }
 
+function greetingByTime() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+}
+
+function firstName(name) {
+  return name?.trim().split(/\s+/)[0] || "Student";
+}
+
+function lectureGreeting(count) {
+  if (count > 0) return "Enjoying today's lecture?";
+  return "No lecture is lined up yet.";
+}
+
 function VenueQueue({ lecture }) {
   const venueId = lecture?.venue_id;
   const lectureDate = lecture?.date;
@@ -77,11 +93,17 @@ function VenueQueue({ lecture }) {
 export default function StudentDashboard() {
   const [selectedLecture, setSelectedLecture] = useState(null);
 
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: () => apiRequest("/profile/me"),
+  });
+
   const lecturesQuery = useQuery({
     queryKey: ["student", "lectures"],
     queryFn: () => apiRequest("/student/lectures"),
   });
 
+  const profile = profileQuery.data?.profile;
   const lectures = lecturesQuery.data?.lectures || [];
 
   return (
@@ -89,6 +111,12 @@ export default function StudentDashboard() {
       <section className="page-heading">
         <p className="eyebrow">Student</p>
         <h1>Dashboard</h1>
+      </section>
+
+      <section className="student-greeting-card">
+        <p className="eyebrow">{greetingByTime()}</p>
+        <h2>{greetingByTime()}, {firstName(profile?.name)}.</h2>
+        <p className="muted">{lectureGreeting(lectures.length)}</p>
       </section>
 
       <section className="student-summary-card">
