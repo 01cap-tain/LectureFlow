@@ -10,12 +10,14 @@ const MODERATOR_EMAIL = __ENV.MODERATOR_EMAIL;
 const MODERATOR_PASSWORD = __ENV.MODERATOR_PASSWORD;
 const TEST_VENUE_ID = __ENV.TEST_VENUE_ID;
 const REPORT_DIR = __ENV.REPORT_DIR || ".";
+const SPIKE_MAX_VUS = Number(__ENV.SPIKE_MAX_VUS || 150);
 
 export const options = {
   stages: [
     { duration: "20s", target: 10 },
-    { duration: "10s", target: 150 },
-    { duration: "40s", target: 150 },
+    // Peak users are configurable so we can test 150, 300, 350+ without editing stages again.
+    { duration: "10s", target: SPIKE_MAX_VUS },
+    { duration: "40s", target: SPIKE_MAX_VUS },
     { duration: "10s", target: 10 },
     { duration: "20s", target: 0 },
   ],

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../api/client";
 import { PasswordInput } from "../components/PasswordInput";
@@ -7,6 +7,7 @@ import logo from "../assets/LogoMakr-8frzfc.png";
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
@@ -84,11 +85,16 @@ export default function SignIn() {
             <span>Password</span>
             <PasswordInput value={form.password} onChange={updateField} />
           </label>
+          {location.state?.message ? <p className="form-success">{location.state.message}</p> : null}
           {error ? <p className="form-error">{error}</p> : null}
           <button className="primary-button" type="submit" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
+
+        <p className="auth-switch">
+          New student? <Link to="/auth/signup">Create account</Link>
+        </p>
       </section>
     </main>
   );
