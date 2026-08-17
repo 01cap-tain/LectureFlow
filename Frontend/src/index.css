@@ -1050,4 +1050,84 @@ h1,
   color: var(--accent-2);
 }
 
+@media (max-width: 390px) {
+  .phone-shell {
+    padding-inline: 10px;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .app-header {
+    padding-bottom: 10px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-heading h1 {
+    font-size: 1.2rem;
+  }
+
+  .panel-title-row {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .compact-button {
+    min-height: 32px;
+    padding-inline: 8px;
+    font-size: 0.66rem;
+  }
+
+  .field-label {
+    font-size: 0.74rem;
+  }
+
+  .field-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .time-picker-row {
+    grid-template-columns: minmax(0, 1fr) minmax(66px, 0.72fr);
+    gap: 6px;
+  }
+
+  .venue-context {
+    padding: 9px;
+  }
+
+  .venue-time-row {
+    grid-template-columns: 1fr;
+  }
+
+  .venue-time-row strong,
+  .venue-time-row small {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .schedule-card {
+    flex-basis: min(190px, calc(100vw - 42px));
+  }
+
+  .bottom-tabs {
+    width: min(236px, calc(100% - 32px));
+    min-height: 54px;
+    padding: 5px;
+  }
+
+  .tab-link {
+    height: 43px;
+    font-size: 0.6rem;
+  }
+}
+
 
