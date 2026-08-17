@@ -395,6 +395,21 @@ h1,
   gap: 13px;
 }
 
+.compact-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.72rem;
+}
+
+.draft-notice {
+  padding: 9px 10px;
+  border: 1px solid rgba(168, 175, 162, 0.2);
+  border-radius: 8px;
+  color: var(--soft);
+  background: rgba(95, 103, 92, 0.12);
+  font-size: 0.76rem;
+}
+
 .field-shell {
   display: grid;
   gap: 7px;

@@ -14,7 +14,9 @@ function getCampusDateTime() {
     hour12: false,
   }).formatToParts(new Date());
 
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
   return {
     date: `${values.year}-${values.month}-${values.day}`,
     time: `${values.hour}:${values.minute}:${values.second}`,
@@ -23,10 +25,14 @@ function getCampusDateTime() {
 
 function isPastLectureStart(date, start_time) {
   const now = getCampusDateTime();
-  const lectureDate = typeof date === "string" ? date : date.toISOString().slice(0, 10);
+  const lectureDate =
+    typeof date === "string" ? date : date.toISOString().slice(0, 10);
   const lectureStart = String(start_time).slice(0, 5);
 
-  return lectureDate < now.date || (lectureDate === now.date && lectureStart <= now.time.slice(0, 5));
+  return (
+    lectureDate < now.date ||
+    (lectureDate === now.date && lectureStart <= now.time.slice(0, 5))
+  );
 }
 
 /**
@@ -126,7 +132,7 @@ export async function scheduleLecture(req, res) {
         notes,
       ],
     );
-
+    console.log(result.rows[0]);
     await client.query("COMMIT");
     await clearStudentLecturesCache({
       department_id,
@@ -572,8 +578,3 @@ export async function getMyLectures(req, res) {
     });
   }
 }
-
-
-
-
-

@@ -34,6 +34,43 @@ const initialForm = {
 
 const hourOptions = buildHourOptions();
 const minuteOptions = buildMinuteOptions();
+const scheduleDraftKey = "lectureflow:moderator:schedule-draft";
+
+function readScheduleDraft() {
+  try {
+    const storedDraft = window.sessionStorage.getItem(scheduleDraftKey);
+    return storedDraft ? JSON.parse(storedDraft) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeScheduleDraft(draft) {
+  try {
+    window.sessionStorage.setItem(scheduleDraftKey, JSON.stringify(draft));
+  } catch (_) {
+    // Draft persistence should never block scheduling if browser storage is unavailable.
+  }
+}
+
+function clearScheduleDraft() {
+  try {
+    window.sessionStorage.removeItem(scheduleDraftKey);
+  } catch (_) {
+    // Browser storage failures are ignored because the submitted lecture is already handled by the API.
+  }
+}
+
+function hasDraftInput(draft) {
+  return Boolean(
+    draft.course_id ||
+      draft.venue_id ||
+      draft.date !== initialForm.date ||
+      draft.start_hour ||
+      draft.end_hour ||
+      draft.notes,
+  );
+}
 
 function VenueContext({ venueId }) {
   const venueQueue = useQuery({
@@ -105,7 +142,9 @@ export default function ModeratorDashboard() {
   const queryClient = useQueryClient();
   const upcomingSectionRef = useRef(null);
   const upcomingStripRef = useRef(null);
+  const draftLoadedRef = useRef(false);
   const [form, setForm] = useState(initialForm);
+  const [draftRestored, setDraftRestored] = useState(false);
   const [toast, setToast] = useState(null);
 
   const profileQuery = useQuery({
@@ -129,6 +168,27 @@ export default function ModeratorDashboard() {
   const venues = venuesQuery.data?.venues || [];
   const lectures = lecturesQuery.data?.lectures || [];
   const lecturerName = profileQuery.data?.profile?.name || "You";
+
+  useEffect(() => {
+    const savedDraft = readScheduleDraft();
+    draftLoadedRef.current = true;
+
+    if (!savedDraft) return;
+
+    setForm((current) => ({ ...current, ...savedDraft }));
+    setDraftRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoadedRef.current) return;
+
+    if (!hasDraftInput(form)) {
+      clearScheduleDraft();
+      return;
+    }
+
+    writeScheduleDraft(form);
+  }, [form]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -167,6 +227,8 @@ export default function ModeratorDashboard() {
       apiRequest("/lectures", { method: "POST", body: payload }),
     onSuccess: () => {
       setForm(initialForm);
+      clearScheduleDraft();
+      setDraftRestored(false);
       queryClient.invalidateQueries({ queryKey: ["moderator"] });
       showToast("success", "Lecture scheduled.");
     },
@@ -178,10 +240,18 @@ export default function ModeratorDashboard() {
   }
 
   function updateField(event) {
+    setDraftRestored(false);
     setForm((current) => ({
       ...current,
       [event.target.name]: event.target.value,
     }));
+  }
+
+  function handleClearDraft() {
+    clearScheduleDraft();
+    setForm(initialForm);
+    setDraftRestored(false);
+    showToast("success", "Draft cleared.");
   }
 
   function handleSubmit(event) {
@@ -221,7 +291,15 @@ export default function ModeratorDashboard() {
       <section className="tool-panel schedule-panel">
         <div className="panel-title-row">
           <h2>New lecture</h2>
+          {hasDraftInput(form) ? (
+            <button className="secondary-button compact-button" type="button" onClick={handleClearDraft}>
+              Clear draft
+            </button>
+          ) : null}
         </div>
+        {draftRestored ? (
+          <p className="draft-notice">Unsaved schedule restored.</p>
+        ) : null}
         <form className="form-stack schedule-form" onSubmit={handleSubmit}>
           <label className="field-shell">
             <span className="field-label">
