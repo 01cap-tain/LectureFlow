@@ -15,7 +15,7 @@ export async function sendPasswordResetEmail({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || "LectureFlow <onboarding@resend.dev>",
+      from: process.env.RESEND_FROM_EMAIL || "<noreply@lectureflow.name.ng",
       to: email,
       subject: "Reset your LectureFlow password",
       html: `
