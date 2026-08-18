@@ -5,6 +5,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminProfile = lazy(() => import("./pages/AdminProfile"));
 const AdminResourceDetail = lazy(() => import("./pages/AdminResourceDetail"));
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/auth/signin" element={<SignIn />} />
         <Route path="/auth/signup" element={<SignUp />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
         <Route path="/admin/dashboard" element={protect(<AdminDashboard />, ["admin"])} />
         <Route path="/admin/profile" element={protect(<AdminProfile />, ["admin"])} />
         <Route path="/admin/resources/:resource/:id" element={protect(<AdminResourceDetail />, ["admin"])} />

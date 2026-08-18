@@ -2,7 +2,7 @@ import argon2 from "argon2";
 import { createHash, randomBytes } from "node:crypto";
 import pool from "../Database/db.js";
 import { extractDepartmentCodeFromMatric } from "../Services/departmentFromMatric.js";
-import { deleteCacheKeys, setJsonCache } from "../Services/cache.js";
+import { deleteCacheKeys, getJsonCache, setJsonCache } from "../Services/cache.js";
 import { sendPasswordResetEmail } from "../Services/email.service.js";
 
 // AUTH CONTROLLER: student SignUp uses DB transaction + department from matric
@@ -371,6 +371,57 @@ async function ForgotPassword(req, res) {
     });
   }
 }
+
+/**
+ * Complete forgot-password reset using the one-time token sent by email.
+ */
+async function ResetPassword(req, res) {
+  const { token, password } = req.body;
+
+  try {
+    const tokenHash = hashResetToken(token);
+    const cacheKey = `password-reset:token:${tokenHash}`;
+    const resetData = await getJsonCache(cacheKey);
+
+    if (!resetData?.user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset link is invalid or has expired",
+      });
+    }
+
+    const password_hash = await argon2.hash(password);
+
+    const result = await pool.query(
+      `UPDATE users
+       SET password_hash = $1,
+           updated_at = NOW()
+       WHERE id = $2 AND is_active = true
+       RETURNING id`,
+      [password_hash, resetData.user_id],
+    );
+
+    await deleteCacheKeys([cacheKey]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. Please sign in.",
+    });
+  } catch (err) {
+    console.error("ResetPassword error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not reset password",
+    });
+  }
+}
 /**
  * Sign out any role: destroy session cache and clear cookie.
  */
@@ -391,4 +442,4 @@ async function SignOut(req, res) {
   }
 }
 
-export { ForgotPassword, SignUp, SignIn, SignOut };
+export { ForgotPassword, ResetPassword, SignUp, SignIn, SignOut };

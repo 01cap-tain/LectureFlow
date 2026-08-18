@@ -1,12 +1,14 @@
 import express from "express";
 import {
   ForgotPassword,
+  ResetPassword,
   SignUp,
   SignIn,
   SignOut,
 } from "../Controller/user-auth.js";
 import {
   validateForgotPassword,
+  validateResetPassword,
   validateSignUp,
   validateSignIn,
   requireAuth,
@@ -27,6 +29,14 @@ router.post(
   authRateLimit,
   validateForgotPassword,
   ForgotPassword,
+);
+
+// Public route: user received a reset token by email and is setting a new password.
+router.post(
+  "/reset-password",
+  authRateLimit,
+  validateResetPassword,
+  ResetPassword,
 );
 
 // Authenticated users only

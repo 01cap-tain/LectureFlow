@@ -213,3 +213,54 @@ export function validateForgotPassword(req, res, next) {
   }
 }
 
+/**
+ * Public reset-password validation. User comes from an email token link.
+ */
+export function validateResetPassword(req, res, next) {
+  try {
+    const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+    const password =
+      typeof req.body?.password === "string" ? req.body.password : "";
+
+    const errors = [];
+
+    if (!token || !validator.isLength(token, { min: 32, max: 256 })) {
+      errors.push("Reset token is required");
+    }
+
+    if (!password) {
+      errors.push("Password is required");
+    } else {
+      const strong = validator.isStrongPassword(password, {
+        minLength: 8,
+        minLowercase: 1,
+        minUppercase: 1,
+        minNumbers: 1,
+        minSymbols: 0,
+      });
+
+      if (!strong) {
+        errors.push(
+          "Password must be at least 8 characters and include uppercase, lowercase, and a number",
+        );
+      } else if (!validator.isLength(password, { max: 128 })) {
+        errors.push("Password must be at most 128 characters");
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    req.body.token = token;
+    req.body.password = password;
+    return next();
+  } catch (err) {
+    console.error("validateResetPassword error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Validation failed",
+    });
+  }
+}
+
