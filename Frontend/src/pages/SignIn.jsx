@@ -90,6 +90,9 @@ export default function SignIn() {
             <span>Password</span>
             <PasswordInput value={form.password} onChange={updateField} />
           </label>
+          <p className="auth-side-link">
+            <Link to="/auth/forgot-password">Forgot password?</Link>
+          </p>
           {location.state?.message ? <p className="form-success">{location.state.message}</p> : null}
           {error ? <p className="form-error">{error}</p> : null}
           <button className="primary-button" type="submit" disabled={loading}>

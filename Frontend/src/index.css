@@ -194,6 +194,8 @@ input:focus, select:focus { border-color: var(--accent-2); box-shadow: 0 0 0 3px
 .form-success { color: var(--soft); background: var(--success-bg); }
 .auth-switch { color: var(--muted); font-size: 0.82rem; text-align: center; }
 .auth-switch a { color: var(--soft); font-weight: 850; text-decoration: none; }
+.auth-side-link { margin-top: -4px; font-size: 0.76rem; text-align: right; }
+.auth-side-link a { color: var(--accent-2); font-weight: 850; text-decoration: none; }
 
 .section-tabs { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 7px; scrollbar-width: none; }
 .section-tabs::-webkit-scrollbar { display: none; }
