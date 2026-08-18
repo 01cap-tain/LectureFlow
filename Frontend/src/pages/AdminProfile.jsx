@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Building2, LayoutDashboard, LogOut, Mail, Phone, Shield, UserRound } from "lucide-react";
 import { apiRequest } from "../api/client";
 import { MobileShell } from "../components/MobileShell";
+import { ProfilePasswordReset } from "../components/ProfilePasswordReset";
 import { ProfileRows } from "../components/ProfileRows";
 
 const tabs = [
@@ -62,6 +63,8 @@ export default function AdminProfile() {
           ]}
         />
       ) : null}
+
+      <ProfilePasswordReset />
 
       <section className="session-card">
         <div>

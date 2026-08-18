@@ -3,11 +3,13 @@ import { requireAuth } from "../Middleware/user-middleware.js";
 import { profileUpdateRateLimit } from "../Middleware/rate-limit.middleware.js";
 import {
   validateCompleteProfile,
+  validateProfilePasswordReset,
   validateUpdateProfile,
 } from "../Middleware/profile.middleware.js";
 import {
   getMyProfile,
   completeProfile,
+  resetProfilePassword,
   updateProfile,
 } from "../Controller/profile.controller.js";
 
@@ -28,6 +30,14 @@ router.patch(
   profileUpdateRateLimit,
   validateUpdateProfile,
   updateProfile,
+);
+
+router.patch(
+  "/password",
+  requireAuth,
+  profileUpdateRateLimit,
+  validateProfilePasswordReset,
+  resetProfilePassword,
 );
 
 export default router;

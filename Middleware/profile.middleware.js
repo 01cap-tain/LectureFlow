@@ -105,3 +105,58 @@ export function validateUpdateProfile(req, res, next) {
       .json({ success: false, message: "Validation failed" });
   }
 }
+
+/**
+ * Validate logged-in password reset/change from the profile page.
+ */
+export function validateProfilePasswordReset(req, res, next) {
+  try {
+    const current_password =
+      typeof req.body?.current_password === "string"
+        ? req.body.current_password
+        : "";
+    const new_password =
+      typeof req.body?.new_password === "string" ? req.body.new_password : "";
+
+    const errors = [];
+
+    if (!current_password) {
+      errors.push("Current password is required");
+    }
+
+    const strong = validator.isStrongPassword(new_password, {
+      minLength: 8,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 0,
+    });
+
+    if (!new_password) {
+      errors.push("New password is required");
+    } else if (!strong) {
+      errors.push(
+        "New password must be at least 8 characters and include uppercase, lowercase, and a number",
+      );
+    } else if (!validator.isLength(new_password, { max: 128 })) {
+      errors.push("New password must be at most 128 characters");
+    }
+
+    if (current_password && new_password && current_password === new_password) {
+      errors.push("New password must be different from current password");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    req.body.current_password = current_password;
+    req.body.new_password = new_password;
+    return next();
+  } catch (err) {
+    console.error("validateProfilePasswordReset error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Validation failed" });
+  }
+}

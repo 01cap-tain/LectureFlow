@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Building2, GraduationCap, Hash, LogOut, Mail, UserRound } from "lucide-react";
 import { apiRequest } from "../api/client";
 import { MobileShell } from "../components/MobileShell";
+import { ProfilePasswordReset } from "../components/ProfilePasswordReset";
 import { ProfileRows } from "../components/ProfileRows";
 import { studentTabs } from "./studentConfig";
 
@@ -55,6 +56,8 @@ export default function StudentProfile() {
           ]}
         />
       ) : null}
+
+      <ProfilePasswordReset />
 
       <section className="session-card">
         <div>

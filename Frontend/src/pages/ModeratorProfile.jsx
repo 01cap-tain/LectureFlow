@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Building2, GraduationCap, Hash, LogOut, Mail, Shield, UserRound } from "lucide-react";
 import { apiRequest } from "../api/client";
 import { MobileShell } from "../components/MobileShell";
+import { ProfilePasswordReset } from "../components/ProfilePasswordReset";
 import { ProfileRows } from "../components/ProfileRows";
 import { moderatorTabs } from "./moderatorConfig";
 
@@ -54,6 +55,8 @@ export default function ModeratorProfile() {
           ]}
         />
       ) : null}
+
+      <ProfilePasswordReset />
 
       <section className="session-card">
         <div>

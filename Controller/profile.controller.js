@@ -1,3 +1,4 @@
+import argon2 from "argon2";
 import pool from "../Database/db.js";
 
 /**
@@ -167,6 +168,64 @@ export async function updateProfile(req, res) {
     return res.status(500).json({
       success: false,
       message: "Could not update profile",
+    });
+  }
+}
+
+/**
+ * Reset/change password for a logged-in user from their profile page.
+ */
+export async function resetProfilePassword(req, res) {
+  const userId = req.session.user.id;
+  const { current_password, new_password } = req.body;
+
+  try {
+    const result = await pool.query(
+      `SELECT id, password_hash
+       FROM users
+       WHERE id = $1 AND is_active = true
+       LIMIT 1`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const valid = await argon2.verify(
+      result.rows[0].password_hash,
+      current_password,
+    );
+
+    if (!valid) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    const password_hash = await argon2.hash(new_password);
+
+    await pool.query(
+      `UPDATE users
+       SET password_hash = $1,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [password_hash, userId],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (err) {
+    console.error("resetProfilePassword error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Could not update password",
     });
   }
 }
